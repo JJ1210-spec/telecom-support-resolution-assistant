@@ -1,0 +1,92 @@
+{
+  "generator_seed": 20261002,
+  "origin": "Original synthetic telecom data. The Tobi-Bueck dataset informed field structure only; no rows were copied.",
+  "counts": {
+    "resolved_tickets": 192,
+    "unresolved_tickets": 96,
+    "kb_articles": 16,
+    "eval_cases": 56,
+    "update_events": 5
+  },
+  "intents": {
+    "connectivity.intermittent_drop": {
+      "product": "Home Broadband",
+      "kb_id": "KB-BB-DROP"
+    },
+    "connectivity.slow_speed": {
+      "product": "Home Broadband",
+      "kb_id": "KB-BB-SLOW"
+    },
+    "wifi.coverage_or_interference": {
+      "product": "Router/CPE",
+      "kb_id": "KB-BB-WIFI"
+    },
+    "fiber.loss_of_signal": {
+      "product": "Fiber",
+      "kb_id": "KB-FIBER-LOS"
+    },
+    "connectivity.area_outage": {
+      "product": "Home Broadband",
+      "kb_id": "KB-BB-OUTAGE"
+    },
+    "mobile.data_unavailable": {
+      "product": "Mobile Prepaid",
+      "kb_id": "KB-MOB-DATA"
+    },
+    "mobile.voice_calls_fail": {
+      "product": "Mobile Postpaid",
+      "kb_id": "KB-MOB-CALL"
+    },
+    "mobile.otp_sms_missing": {
+      "product": "Mobile Postpaid",
+      "kb_id": "KB-MOB-OTP"
+    },
+    "mobile.roaming_unavailable": {
+      "product": "Mobile Postpaid",
+      "kb_id": "KB-MOB-ROAM"
+    },
+    "sim.activation_pending": {
+      "product": "Mobile Prepaid",
+      "kb_id": "KB-SIM-ACT"
+    },
+    "sim.esim_download_failed": {
+      "product": "eSIM",
+      "kb_id": "KB-ESIM-QR"
+    },
+    "billing.unexpected_charge": {
+      "product": "Billing Account",
+      "kb_id": "KB-BILL-EXTRA"
+    },
+    "billing.payment_not_reflected": {
+      "product": "Billing Account",
+      "kb_id": "KB-BILL-PAY"
+    },
+    "plan.renewal_failed": {
+      "product": "Mobile Prepaid",
+      "kb_id": "KB-PLAN-RENEW"
+    },
+    "porting.transfer_delayed": {
+      "product": "Mobile Postpaid",
+      "kb_id": "KB-PORT-DELAY"
+    },
+    "tv.picture_breakup": {
+      "product": "TV",
+      "kb_id": "KB-TV-PIXEL"
+    }
+  },
+  "languages_resolved": {
+    "hinglish": 32,
+    "en": 128,
+    "hi": 32
+  },
+  "languages_unresolved": {
+    "en": 64,
+    "hi": 16,
+    "hinglish": 16
+  },
+  "languages_eval": {
+    "hi": 17,
+    "en": 22,
+    "hinglish": 17
+  }
+}
