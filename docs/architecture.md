@@ -24,12 +24,12 @@ This is simpler than two physical databases for the first phase. The table and v
 
 1. `POST /v1/resolve` validates a 5–5000 character complaint.
 2. Assist obtains the live taxonomy from Knowledge. The chat model returns structured triage. Unknown intents map to `other`.
-3. Assist searches resolved tickets and KB separately by semantic embedding.
+3. Assist searches resolved tickets and KB separately by semantic embedding. If the top three resolved tickets agree strongly on an intent that differs from the small model, it adjusts intent, category and product. Narrow total-service-loss and recurring-impact rules can raise severity; adjustments are returned in `warnings`.
 4. A configurable score gate retains candidate sources. The chat model receives only these sources and returns numbered steps with IDs.
 5. Assist removes citations absent from the retrieved set and drops steps left without citations. If no supported steps remain, it returns `insufficient_evidence` with the sources.
 6. The interface displays triage, sources, draft, warnings and trace ID for agent review.
 
-The model cannot prove that a step is supported merely by naming a valid source. Citation-support evaluation is a known next-phase gap.
+The model cannot prove that a step is supported merely by naming a valid source. Citation-support evaluation is a known next-phase gap. The local CPU model may take about a minute per complaint in the tested setup, so the interface describes that wait honestly.
 
 ## Ingestion and evolving classes
 
@@ -37,4 +37,4 @@ The model cannot prove that a step is supported merely by naming a valid source.
 
 ## Current risks and follow-up work
 
-The dataset is templated and synthetic. Severity and sentiment depend on a small local model and need measured evaluation. The minimum similarity threshold is an uncalibrated default. SQLite vector search scans matching rows in Python. Citation validation checks IDs but not factual support. There is no authentication, tenant isolation, PII redaction, feedback store, observability backend or high-availability deployment. These are documented gaps, not capabilities claimed by the MVP.
+The dataset is templated and synthetic. Severity and sentiment depend on a small local model plus narrow rules and need measured evaluation. The minimum similarity threshold is an uncalibrated default. SQLite vector search scans matching rows in Python. Citation validation checks IDs but not factual support. There is no authentication, tenant isolation, PII redaction, feedback store, persistent trace store, observability backend or high-availability deployment. These are documented gaps, not capabilities claimed by the MVP.

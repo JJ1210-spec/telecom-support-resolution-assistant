@@ -10,7 +10,7 @@ One source of truth and status-based search pools make the unresolved-to-resolve
 
 ## Verification
 
-Focused tests exercise unresolved exclusion, transition into evidence, stale-version rejection, KB deprecation and the HTTP search endpoint. Final test results are recorded in the phase integration note once all changes are tested.
+Focused tests exercise unresolved exclusion, transition into evidence, stale-version rejection, KB deprecation and the HTTP search endpoint. The live seed loaded 192 resolved tickets, 96 unresolved tickets and 16 published KB articles. The update fixture then moved three tickets to resolved status, published one new KB version and deprecated one article. Live counts became 195 resolved, 93 unresolved, 15 published KB and 1 deprecated KB. See Phase 4 for the end-to-end checks.
 
 ## Limits
 

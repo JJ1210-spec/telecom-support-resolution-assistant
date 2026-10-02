@@ -1,0 +1,131 @@
+{
+  "as_of_utc": "2026-10-02T10:41:06.195665+00:00",
+  "dataset": "synthetic_telecom_v1 unindexed_development_eval",
+  "embedding_model": "embeddinggemma",
+  "answerable_cases": 48,
+  "recall_at_1": 0.75,
+  "recall_at_3": 0.9167,
+  "elapsed_seconds": 10.07,
+  "score_analysis": {
+    "answerable_median": 0.6763,
+    "abstain_median": 0.4867,
+    "thresholds": [
+      {
+        "threshold": 0.55,
+        "answerable_kept": 45,
+        "abstain_rejected": 6
+      },
+      {
+        "threshold": 0.6,
+        "answerable_kept": 39,
+        "abstain_rejected": 7
+      },
+      {
+        "threshold": 0.65,
+        "answerable_kept": 36,
+        "abstain_rejected": 8
+      },
+      {
+        "threshold": 0.7,
+        "answerable_kept": 20,
+        "abstain_rejected": 8
+      }
+    ],
+    "abstain_cases": [
+      {
+        "case_id": "E-UNKNOWN-01",
+        "should_abstain": true,
+        "top_score": 0.39956
+      },
+      {
+        "case_id": "E-UNKNOWN-06",
+        "should_abstain": true,
+        "top_score": 0.53361
+      },
+      {
+        "case_id": "E-UNKNOWN-08",
+        "should_abstain": true,
+        "top_score": 0.47717
+      },
+      {
+        "case_id": "E-UNKNOWN-03",
+        "should_abstain": true,
+        "top_score": 0.48372
+      },
+      {
+        "case_id": "E-UNKNOWN-02",
+        "should_abstain": true,
+        "top_score": 0.57538
+      },
+      {
+        "case_id": "E-UNKNOWN-07",
+        "should_abstain": true,
+        "top_score": 0.63589
+      },
+      {
+        "case_id": "E-UNKNOWN-04",
+        "should_abstain": true,
+        "top_score": 0.48967
+      },
+      {
+        "case_id": "E-UNKNOWN-05",
+        "should_abstain": true,
+        "top_score": 0.43671
+      }
+    ]
+  },
+  "misses_at_3": [
+    {
+      "case_id": "E-MOB-CALL-02",
+      "expected": [
+        "KB-MOB-CALL"
+      ],
+      "top3": [
+        "KB-BB-WIFI",
+        "KB-BB-DROP",
+        "KB-MOB-DATA"
+      ],
+      "hit_at_1": false,
+      "hit_at_3": false
+    },
+    {
+      "case_id": "E-PLAN-RENEW-03",
+      "expected": [
+        "KB-PLAN-RENEW"
+      ],
+      "top3": [
+        "KB-ESIM-QR",
+        "KB-MOB-DATA",
+        "KB-SIM-ACT"
+      ],
+      "hit_at_1": false,
+      "hit_at_3": false
+    },
+    {
+      "case_id": "E-BB-DROP-02",
+      "expected": [
+        "KB-BB-DROP"
+      ],
+      "top3": [
+        "KB-BB-WIFI",
+        "KB-BB-SLOW",
+        "KB-BB-OUTAGE"
+      ],
+      "hit_at_1": false,
+      "hit_at_3": false
+    },
+    {
+      "case_id": "E-MOB-CALL-03",
+      "expected": [
+        "KB-MOB-CALL"
+      ],
+      "top3": [
+        "KB-BB-WIFI",
+        "KB-BB-DROP",
+        "KB-MOB-DATA"
+      ],
+      "hit_at_1": false,
+      "hit_at_3": false
+    }
+  ]
+}

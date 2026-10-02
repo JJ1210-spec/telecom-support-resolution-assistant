@@ -6,7 +6,7 @@ A local-first, two-service assistant for telecom support agents. It classifies a
 
 - **Knowledge service** on port 8001: canonical SQLite records, versioned updates, taxonomy and semantic search. Unresolved cases are kept in a separate logical search pool and cannot be returned as resolution evidence.
 - **Assist API** on port 8000: complaint triage, retrieval orchestration, cited draft validation and the agent web interface.
-- **Ollama** on port 11434: `embeddinggemma` for multilingual embeddings and `qwen3:4b` for triage and drafting.
+- **Ollama** on port 11434: `embeddinggemma` for multilingual embeddings and `qwen3:1.7b` for triage and drafting on a CPU laptop.
 
 The web interface is at `http://127.0.0.1:8000`. OpenAPI documentation is at `/docs` on each service. See [architecture](docs/architecture.md) for the complete flow and current limits.
 
@@ -16,7 +16,7 @@ The web interface is at `http://127.0.0.1:8000`. OpenAPI documentation is at `/d
 
    ```powershell
    ollama pull embeddinggemma
-   ollama pull qwen3:4b
+   ollama pull qwen3:1.7b
    ```
 
 2. Create a Python 3.11+ environment from the project directory:
@@ -53,7 +53,7 @@ $body = @{ complaint = 'My fiber box has a red LOS light and there is no interne
 Invoke-RestMethod -Uri 'http://127.0.0.1:8000/v1/resolve' -Method Post -ContentType 'application/json' -Body $body
 ```
 
-The response contains `triage`, retrieved `sources`, cited `steps`, `decision` and `trace_id`. A missing or invalid model draft returns sources with an `insufficient_evidence` decision. An agent must review any draft before using it.
+The response contains `triage`, retrieved `sources`, cited `steps`, `decision` and `trace_id`. Weak retrieval or a missing or invalid model draft returns sources with an `insufficient_evidence` decision. The provisional draft gate is `MIN_DRAFT_SCORE=0.60`; it favors caution and can withhold a draft for an answerable complaint. An agent must review any draft before using it.
 
 To exercise evolving data after baseline testing, run `.venv\Scripts\python -m telecom_assistant.seed updates`. This applies three unresolved-to-resolved moves, one KB update and one KB deprecation from [the fixture](data/synthetic/v1/update_events.jsonl). Use a fresh database to return to the baseline.
 
@@ -64,4 +64,4 @@ To exercise evolving data after baseline testing, run `.venv\Scripts\python -m t
 .venv\Scripts\python -m ruff check src tests scripts
 ```
 
-The [dataset guide](data/synthetic/v1/README.md) explains schemas and limitations. [Phase records](docs/phases/) explain what was completed and why; [issues and errors](docs/issues-and-errors.md) records problems, remedies and verification. The evaluation set is never indexed. This MVP has no measured claim of production accuracy or throughput yet.
+The [dataset guide](data/synthetic/v1/README.md) explains schemas and limitations. [Phase records](docs/phases/) explain what was completed and why; [issues and errors](docs/issues-and-errors.md) records problems, remedies and verification. The evaluation set is never indexed, but was used to inspect retrieval scores, so its [report](reports/retrieval_eval.json) is a development baseline, not a final test. This MVP has no measured claim of production accuracy or throughput yet.

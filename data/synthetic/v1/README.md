@@ -13,7 +13,7 @@ This is an **original synthetic** dataset for the telecom resolution assistant. 
 | `update_events.jsonl` | Later ticket resolution and KB update/deprecation events | Apply only in a dedicated update test |
 | `manifest.json` | Counts, generator seed, intents and language distribution | No |
 
-Every line of a `.jsonl` file is one UTF-8 JSON object. IDs are stable for this generator version. Use separate search indexes for resolved cases and unresolved cases if both need similarity search, while keeping a single authoritative record store and an explicit status transition. Never let unresolved cases supply a proposed fix or a citation for a resolution step.
+Every line of a `.jsonl` file is one UTF-8 JSON object. IDs are stable for this generator version and do not encode mutable status. Use separate search indexes for resolved cases and unresolved cases if both need similarity search, while keeping a single authoritative record store and an explicit status transition. Never let unresolved cases supply a proposed fix or a citation for a resolution step.
 
 ## Ticket fields
 
