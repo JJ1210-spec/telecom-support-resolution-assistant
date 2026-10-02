@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import httpx
 
 
@@ -31,7 +33,7 @@ class OllamaClient:
             raise OllamaError("Ollama returned an unexpected embedding count or empty vector")
         return vectors
 
-    async def chat_json(self, system: str, user: str) -> dict:
+    async def chat_json(self, system: str, user: str, max_tokens: int = 320) -> dict:
         try:
             async with httpx.AsyncClient(timeout=120.0) as client:
                 response = await client.post(
@@ -42,13 +44,19 @@ class OllamaClient:
                         "stream": False,
                         "format": "json",
                         "think": False,
-                        "options": {"temperature": 0},
+                        "options": {"temperature": 0, "num_predict": max_tokens, "num_ctx": 3072},
                     },
                 )
                 response.raise_for_status()
-                import json
-
-                result = json.loads(response.json()["message"]["content"])
+                payload = response.json()
+                content = payload["message"]["content"]
+                try:
+                    result = json.loads(content)
+                except json.JSONDecodeError as exc:
+                    raise OllamaError(
+                        f"Chat model produced invalid JSON (chars={len(content)}, "
+                        f"reason={payload.get('done_reason', 'unknown')})"
+                    ) from exc
         except (httpx.HTTPError, KeyError, ValueError, TypeError) as exc:
             raise OllamaError(f"Chat model unavailable or invalid JSON: {exc}") from exc
         if not isinstance(result, dict):

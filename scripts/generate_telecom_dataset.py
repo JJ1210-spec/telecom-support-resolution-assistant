@@ -9,9 +9,8 @@ from __future__ import annotations
 import json
 import random
 from collections import Counter
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-
 
 SEED = 20261002
 ROOT = Path(__file__).resolve().parents[1]
@@ -294,8 +293,9 @@ def make_body(issue: dict, i: int, split: str) -> tuple[str, str, list[str]]:
 def ticket(issue: dict, i: int, status: str) -> dict:
     body, lang, tags = make_body(issue, i, "train")
     key = issue["key"]
-    ticket_id = f"T-{key}-{status[0].upper()}{i + 1:03d}"
-    created = datetime(2026, 3, 1, tzinfo=timezone.utc) + timedelta(days=(i * 13 + len(key) * 7) % 180)
+    # IDs must not encode mutable status: a ticket keeps the same ID after resolution.
+    ticket_id = f"T-{key}-{i + 1:03d}"
+    created = datetime(2026, 3, 1, tzinfo=UTC) + timedelta(days=(i * 13 + len(key) * 7) % 180)
     resolved = status == "resolved"
     sentiment = "frustrated" if i % 3 else "concerned"
     body += " " + SENTIMENT_PHRASE[lang][sentiment]

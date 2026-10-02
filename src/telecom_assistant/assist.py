@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import time
 import uuid
 from pathlib import Path
 from typing import Literal
@@ -14,6 +15,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 from .config import Settings
 from .ollama import OllamaClient, OllamaError
+from .triage_rules import reconcile_triage
 
 
 class ResolveInput(BaseModel):
@@ -119,6 +121,7 @@ def create_app(
 
     @app.post("/v1/resolve")
     async def resolve(request: ResolveInput) -> dict:
+        started = time.perf_counter()
         trace_id = str(uuid.uuid4())
         try:
             taxonomy = await knowledge.taxonomy()
@@ -126,6 +129,7 @@ def create_app(
             raise HTTPException(503, f"Knowledge service unavailable: {exc}") from exc
         if not taxonomy:
             raise HTTPException(503, "Taxonomy is empty; seed the knowledge service first")
+        taxonomy_ms = round((time.perf_counter() - started) * 1000)
 
         warnings: list[str] = []
         prompt = json.dumps({
@@ -134,13 +138,14 @@ def create_app(
             "taxonomy": taxonomy,
         }, ensure_ascii=False)
         try:
-            triage = normalize_triage(await model.chat_json(TRIAGE_SYSTEM, prompt), taxonomy)
+            triage = normalize_triage(await model.chat_json(TRIAGE_SYSTEM, prompt, max_tokens=180), taxonomy)
         except (OllamaError, ValidationError, KeyError, TypeError) as exc:
-            warnings.append(f"Triage unavailable: {type(exc).__name__}")
+            warnings.append(f"Triage unavailable: {str(exc)[:200]}")
             triage = {
                 "intent": "other", "category": "Unknown", "product": request.product_hint or "Unknown",
                 "severity": "Unknown", "sentiment": "unknown", "evidence": "", "confidence": 0.0,
             }
+        triage_ms = round((time.perf_counter() - started) * 1000) - taxonomy_ms
 
         try:
             tickets = await knowledge.search(request.complaint, "ticket", 5)
@@ -148,6 +153,9 @@ def create_app(
         except (httpx.HTTPError, KeyError, ValueError) as exc:
             raise HTTPException(503, f"Evidence search unavailable: {exc}") from exc
         sources = [s for s in tickets + articles if s["score"] >= settings.min_retrieval_score]
+        triage, adjustment_notes = reconcile_triage(triage, request.complaint, tickets, taxonomy)
+        warnings.extend(adjustment_notes)
+        retrieval_ms = round((time.perf_counter() - started) * 1000) - taxonomy_ms - triage_ms
         public_sources = [
             {"source_id": s["source_id"], "kind": s["kind"], "score": s["score"], "text": s["text"]}
             for s in sources
@@ -157,6 +165,22 @@ def create_app(
                 "trace_id": trace_id, "triage": triage, "sources": [], "steps": [],
                 "summary": "No sufficiently similar resolved ticket or published article was found.",
                 "decision": "insufficient_evidence", "warnings": warnings,
+                "timings_ms": {"taxonomy": taxonomy_ms, "triage": triage_ms, "retrieval": retrieval_ms, "total": round((time.perf_counter() - started) * 1000)},
+            }
+
+        top_score = max(source["score"] for source in sources)
+        instruction_like = "ignore previous instructions" in request.complaint.casefold()
+        if top_score < settings.min_draft_score or instruction_like:
+            reason = (
+                "The complaint includes instruction-like text; confirm the actual service symptom before drafting."
+                if instruction_like else
+                "Retrieved cases are too weak to support a resolution. Ask for specific symptoms or escalate."
+            )
+            return {
+                "trace_id": trace_id, "triage": triage, "sources": public_sources, "steps": [],
+                "summary": reason, "decision": "insufficient_evidence", "warnings": warnings,
+                "timings_ms": {"taxonomy": taxonomy_ms, "triage": triage_ms, "retrieval": retrieval_ms,
+                               "total": round((time.perf_counter() - started) * 1000)},
             }
 
         generation_input = json.dumps({
@@ -166,11 +190,14 @@ def create_app(
         }, ensure_ascii=False)
         try:
             steps, draft_warnings, summary = validate_draft(
-                await model.chat_json(DRAFT_SYSTEM, generation_input), sources
+                await model.chat_json(DRAFT_SYSTEM, generation_input, max_tokens=360), sources
             )
             warnings.extend(draft_warnings)
+            if any(phrase in summary.casefold() for phrase in ("insufficient evidence", "not enough evidence")):
+                steps = []
+                warnings.append("Draft steps withheld because the summary reports insufficient evidence")
         except (OllamaError, ValidationError, KeyError, TypeError) as exc:
-            warnings.append(f"Draft unavailable: {type(exc).__name__}")
+            warnings.append(f"Draft unavailable: {str(exc)[:200]}")
             steps = []
             summary = "Review the retrieved sources manually or escalate the case."
         return {
@@ -178,6 +205,9 @@ def create_app(
             "steps": steps, "summary": summary,
             "decision": "suggested_resolution" if steps else "insufficient_evidence",
             "warnings": warnings,
+            "timings_ms": {"taxonomy": taxonomy_ms, "triage": triage_ms, "retrieval": retrieval_ms,
+                           "draft": round((time.perf_counter() - started) * 1000) - taxonomy_ms - triage_ms - retrieval_ms,
+                           "total": round((time.perf_counter() - started) * 1000)},
         }
 
     return app
