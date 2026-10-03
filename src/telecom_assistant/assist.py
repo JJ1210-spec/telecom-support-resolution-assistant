@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import json
+import secrets
 import time
 import uuid
 from pathlib import Path
 from typing import Literal
 
 import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field, ValidationError
 
@@ -43,12 +44,13 @@ class DraftResult(BaseModel):
 
 
 class KnowledgeHTTPClient:
-    def __init__(self, base_url: str) -> None:
+    def __init__(self, base_url: str, token: str) -> None:
         self.base_url = base_url.rstrip("/")
+        self.headers = {"X-Service-Token": token}
 
     async def taxonomy(self) -> list[dict]:
         async with httpx.AsyncClient(timeout=15.0) as client:
-            response = await client.get(f"{self.base_url}/v1/taxonomy")
+            response = await client.get(f"{self.base_url}/v1/taxonomy", headers=self.headers)
             response.raise_for_status()
             return response.json()["classes"]
 
@@ -56,7 +58,7 @@ class KnowledgeHTTPClient:
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(
                 f"{self.base_url}/v1/search",
-                json={"query": query, "pool": "evidence", "kind": kind, "limit": limit},
+                json={"query": query, "pool": "evidence", "kind": kind, "limit": limit}, headers=self.headers,
             )
             response.raise_for_status()
             return response.json()["results"]
@@ -108,18 +110,22 @@ def create_app(
 ) -> FastAPI:
     settings = settings or Settings.from_env()
     model = model or OllamaClient(settings.ollama_url, settings.embed_model, settings.chat_model)
-    knowledge = knowledge or KnowledgeHTTPClient(settings.knowledge_url)
+    knowledge = knowledge or KnowledgeHTTPClient(settings.knowledge_url, settings.service_token())
     app = FastAPI(title="Telecom Assist API", version="0.1.0")
 
     @app.get("/", include_in_schema=False)
     def interface() -> FileResponse:
         return FileResponse(Path(__file__).resolve().parents[2] / "web" / "index.html")
 
-    @app.get("/health")
+    def require_service(x_service_token: str | None = Header(default=None)) -> None:
+        if not x_service_token or not secrets.compare_digest(x_service_token, settings.service_token()):
+            raise HTTPException(401, "Service authentication required")
+
+    @app.get("/health", dependencies=[Depends(require_service)])
     def health() -> dict:
         return {"status": "ok", "chat_model": settings.chat_model}
 
-    @app.post("/v1/resolve")
+    @app.post("/v1/resolve", dependencies=[Depends(require_service)])
     async def resolve(request: ResolveInput) -> dict:
         started = time.perf_counter()
         trace_id = str(uuid.uuid4())

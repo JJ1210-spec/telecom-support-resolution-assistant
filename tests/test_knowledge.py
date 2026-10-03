@@ -53,11 +53,12 @@ class FakeEmbedder:
 
 
 def test_knowledge_service_searches_only_eligible_pool(tmp_path: Path) -> None:
-    settings = Settings(knowledge_db=tmp_path / "api.db", embed_model="fake-embed")
+    settings = Settings(knowledge_db=tmp_path / "api.db", embed_model="fake-embed",
+                        service_token_file=tmp_path / "service-token")
     client = TestClient(create_app(settings, FakeEmbedder()))
+    client.headers["X-Service-Token"] = settings.service_token()
     client.post("/v1/records", json={"kind": "ticket", "payload": ticket("T-3", "unresolved", 1)}).raise_for_status()
     evidence = client.post("/v1/search", json={"query": "red LOS", "pool": "evidence", "kind": "ticket"})
     assert evidence.json()["results"] == []
     unresolved = client.post("/v1/search", json={"query": "red LOS", "pool": "unresolved", "kind": "ticket"})
     assert unresolved.json()["results"][0]["source_id"] == "T-3"
-

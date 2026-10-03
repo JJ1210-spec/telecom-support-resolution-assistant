@@ -5,12 +5,13 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import secrets
 import sqlite3
 from contextlib import closing
 from pathlib import Path
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from .config import Settings
@@ -214,19 +215,23 @@ def create_app(settings: Settings | None = None, embedder: OllamaClient | None =
     app = FastAPI(title="Telecom Knowledge Service", version="0.1.0")
     app.state.store = store
 
-    @app.get("/health")
+    def require_service(x_service_token: str | None = Header(default=None)) -> None:
+        if not x_service_token or not secrets.compare_digest(x_service_token, settings.service_token()):
+            raise HTTPException(401, "Service authentication required")
+
+    @app.get("/health", dependencies=[Depends(require_service)])
     def health() -> dict:
         return {"status": "ok", "counts": store.counts(), "embedding_model": settings.embed_model}
 
-    @app.get("/v1/taxonomy")
+    @app.get("/v1/taxonomy", dependencies=[Depends(require_service)])
     def get_taxonomy() -> dict:
         return {"classes": store.taxonomy()}
 
-    @app.post("/v1/taxonomy")
+    @app.post("/v1/taxonomy", dependencies=[Depends(require_service)])
     def put_taxonomy(data: TaxonomyInput) -> dict:
         return {"version": store.upsert_taxonomy(data)}
 
-    @app.post("/v1/records")
+    @app.post("/v1/records", dependencies=[Depends(require_service)])
     async def put_record(record: RecordInput) -> dict:
         try:
             record_id, _, _ = record_identity(record.kind, record.payload)
@@ -238,7 +243,7 @@ def create_app(settings: Settings | None = None, embedder: OllamaClient | None =
             raise HTTPException(503, str(exc)) from exc
         return {"record_id": record_id, "action": action}
 
-    @app.post("/v1/search")
+    @app.post("/v1/search", dependencies=[Depends(require_service)])
     async def search(request: SearchInput) -> dict:
         try:
             vector = (await embedder.embed_many([request.query]))[0]

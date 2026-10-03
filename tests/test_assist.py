@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from fastapi.testclient import TestClient
 
 from telecom_assistant.assist import create_app
@@ -43,8 +45,16 @@ class ConflictedDraftModel(FakeModel):
                 "steps": [{"text": "Run an optical signal test", "citations": ["KB-10"]}]}
 
 
-def test_resolve_validates_citations_and_drops_unknown_only_step() -> None:
-    client = TestClient(create_app(Settings(min_retrieval_score=0.25), FakeModel(), FakeKnowledge()))
+def service_client(tmp_path: Path, settings: Settings, model: FakeModel, knowledge: FakeKnowledge) -> TestClient:
+    settings = Settings(**{**settings.__dict__, "portal_db": tmp_path / "portal.db",
+                           "service_token_file": tmp_path / "service-token"})
+    client = TestClient(create_app(settings, model, knowledge))
+    client.headers["X-Service-Token"] = settings.service_token()
+    return client
+
+
+def test_resolve_validates_citations_and_drops_unknown_only_step(tmp_path: Path) -> None:
+    client = service_client(tmp_path, Settings(min_retrieval_score=0.25), FakeModel(), FakeKnowledge())
     response = client.post("/v1/resolve", json={"complaint": "My fiber box has a red LOS light and no internet"})
     assert response.status_code == 200
     result = response.json()
@@ -57,28 +67,28 @@ def test_resolve_validates_citations_and_drops_unknown_only_step() -> None:
     assert result["trace_id"]
 
 
-def test_weak_retrieval_abstains() -> None:
-    client = TestClient(create_app(Settings(min_retrieval_score=0.95), FakeModel(), FakeKnowledge()))
+def test_weak_retrieval_abstains(tmp_path: Path) -> None:
+    client = service_client(tmp_path, Settings(min_retrieval_score=0.95), FakeModel(), FakeKnowledge())
     result = client.post("/v1/resolve", json={"complaint": "My fiber box has a red LOS light and no internet"}).json()
     assert result["decision"] == "insufficient_evidence"
     assert result["steps"] == []
 
 
-def test_complaint_length_is_bounded() -> None:
-    client = TestClient(create_app(Settings(), FakeModel(), FakeKnowledge()))
+def test_complaint_length_is_bounded(tmp_path: Path) -> None:
+    client = service_client(tmp_path, Settings(), FakeModel(), FakeKnowledge())
     assert client.post("/v1/resolve", json={"complaint": "x"}).status_code == 422
 
 
-def test_weak_evidence_returns_sources_without_draft() -> None:
-    client = TestClient(create_app(Settings(min_draft_score=0.60), FakeModel(), LowScoreKnowledge()))
+def test_weak_evidence_returns_sources_without_draft(tmp_path: Path) -> None:
+    client = service_client(tmp_path, Settings(min_draft_score=0.60), FakeModel(), LowScoreKnowledge())
     result = client.post("/v1/resolve", json={"complaint": "Something is wrong with my service"}).json()
     assert result["decision"] == "insufficient_evidence"
     assert result["sources"]
     assert result["steps"] == []
 
 
-def test_draft_cannot_include_steps_while_claiming_insufficient_evidence() -> None:
-    client = TestClient(create_app(Settings(), ConflictedDraftModel(), FakeKnowledge()))
+def test_draft_cannot_include_steps_while_claiming_insufficient_evidence(tmp_path: Path) -> None:
+    client = service_client(tmp_path, Settings(), ConflictedDraftModel(), FakeKnowledge())
     result = client.post("/v1/resolve", json={"complaint": "My fiber box has red LOS and no internet"}).json()
     assert result["decision"] == "insufficient_evidence"
     assert result["steps"] == []
