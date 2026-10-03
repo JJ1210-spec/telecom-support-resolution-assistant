@@ -1,0 +1,43 @@
+{
+  "areas": [
+    {"id": "internet", "label": "Home internet & Wi-Fi", "icon": "wifi"},
+    {"id": "mobile", "label": "Mobile calls, SMS & data", "icon": "phone"},
+    {"id": "sim", "label": "SIM, eSIM & porting", "icon": "sim"},
+    {"id": "billing", "label": "Bills, payments & recharge", "icon": "card"},
+    {"id": "tv", "label": "TV", "icon": "tv"}
+  ],
+  "classes": [
+    {"intent": "connectivity.intermittent_drop", "label": "Internet keeps disconnecting", "area": "internet", "category": "Technical Support", "product": "Home Broadband", "sensitive": false,
+     "description": "Broadband connects but drops repeatedly, often at specific times of day."},
+    {"intent": "connectivity.slow_speed", "label": "Internet is slow", "area": "internet", "category": "Technical Support", "product": "Home Broadband", "sensitive": false,
+     "description": "Connected, but speeds are well below the plan."},
+    {"intent": "wifi.coverage_or_interference", "label": "Weak Wi-Fi in some rooms", "area": "internet", "category": "Technical Support", "product": "Router/CPE", "sensitive": false,
+     "description": "Wi-Fi is weak or unstable away from the router while wired or nearby devices work."},
+    {"intent": "fiber.loss_of_signal", "label": "Fiber box shows red LOS light", "area": "internet", "category": "Technical Support", "product": "Fiber", "sensitive": true,
+     "description": "Fiber ONT shows LOS (loss of optical signal); no internet at all."},
+    {"intent": "connectivity.area_outage", "label": "Internet down for the whole area", "area": "internet", "category": "Service Outage", "product": "Home Broadband", "sensitive": true,
+     "description": "Multiple premises, the building or the street have no service."},
+    {"intent": "mobile.data_unavailable", "label": "Mobile data not working", "area": "mobile", "category": "Technical Support", "product": "Mobile Prepaid", "sensitive": false,
+     "description": "Phone has signal but mobile data does not load."},
+    {"intent": "mobile.voice_calls_fail", "label": "Calls failing or not coming in", "area": "mobile", "category": "Technical Support", "product": "Mobile Postpaid", "sensitive": false,
+     "description": "Outgoing or incoming calls fail while other services may work."},
+    {"intent": "mobile.otp_sms_missing", "label": "OTP / bank SMS not arriving", "area": "mobile", "category": "Technical Support", "product": "Mobile Postpaid", "sensitive": false,
+     "description": "Verification or bank messages do not arrive though normal SMS may work."},
+    {"intent": "mobile.roaming_unavailable", "label": "No network while roaming abroad", "area": "mobile", "category": "Technical Support", "product": "Mobile Postpaid", "sensitive": false,
+     "description": "Phone cannot register on a partner network abroad."},
+    {"intent": "sim.activation_pending", "label": "New / replacement SIM not activated", "area": "sim", "category": "Account and Activation", "product": "Mobile Prepaid", "sensitive": true,
+     "description": "SIM shows no service after activation; identity-verified provisioning may be needed."},
+    {"intent": "sim.esim_download_failed", "label": "eSIM won't download", "area": "sim", "category": "Account and Activation", "product": "eSIM", "sensitive": false,
+     "description": "eSIM QR code or profile download fails."},
+    {"intent": "porting.transfer_delayed", "label": "Number port is delayed", "area": "sim", "category": "Account and Activation", "product": "Mobile Postpaid", "sensitive": true,
+     "description": "Mobile number portability transfer not completed in the expected window."},
+    {"intent": "billing.unexpected_charge", "label": "Charge I don't recognise", "area": "billing", "category": "Billing", "product": "Billing Account", "sensitive": true,
+     "description": "Bill contains an unexpected or disputed charge."},
+    {"intent": "billing.payment_not_reflected", "label": "Payment not showing", "area": "billing", "category": "Billing", "product": "Billing Account", "sensitive": true,
+     "description": "Customer paid but the account still shows dues."},
+    {"intent": "plan.renewal_failed", "label": "Recharge done but plan not active", "area": "billing", "category": "Plan and Recharge", "product": "Mobile Prepaid", "sensitive": false,
+     "description": "Prepaid recharge or renewal succeeded but the plan entitlement is missing."},
+    {"intent": "tv.picture_breakup", "label": "TV picture freezing / pixelating", "area": "tv", "category": "Technical Support", "product": "TV", "sensitive": false,
+     "description": "TV picture breaks up, freezes or pixelates on one or more channels."}
+  ]
+}

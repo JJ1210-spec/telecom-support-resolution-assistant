@@ -1,0 +1,143 @@
+{
+  "run_id": "eval_20261003_183348",
+  "cases": 56,
+  "answerable": 48,
+  "unanswerable": 8,
+  "triage": {
+    "intent_accuracy": 1.0,
+    "intent_macro_f1": 1.0,
+    "product_accuracy": 1.0,
+    "severity_accuracy": 0.625,
+    "severity_macro_f1": 0.652,
+    "p1_recall": 1.0,
+    "sentiment_agreement": 1.0,
+    "llm_available_cases": 48,
+    "intent_macro_f1_llm_available": 1.0,
+    "severity_macro_f1_llm_available": 0.652,
+    "p1_recall_llm_available": 1.0,
+    "by_language": {
+      "en": 1.0,
+      "hi": 1.0,
+      "hinglish": 1.0
+    }
+  },
+  "clarification": {
+    "intent_accuracy_before_questions": 0.9583,
+    "intent_accuracy_after_questions": 1.0,
+    "mean_questions": 3.77,
+    "mean_information_gain_bits": 1.835
+  },
+  "routing": {
+    "distribution": {
+      "human": 34,
+      "assisted": 21,
+      "self_service": 1
+    },
+    "unsafe_self_service": [],
+    "abstention_precision": 0.7778,
+    "abstention_recall": 0.875
+  },
+  "generation": {
+    "citation_validity": 1.0,
+    "mean_citation_coverage": 0.8893,
+    "judged_steps": 35,
+    "step_support_rate": 1.0
+  },
+  "health": {
+    "latency_ms": {
+      "retrieval": {
+        "p50": 1180,
+        "p95": 1292
+      },
+      "triage": {
+        "p50": 1941,
+        "p95": 2349
+      },
+      "draft": {
+        "p50": 2242,
+        "p95": 20909
+      },
+      "total": {
+        "p50": 5731,
+        "p95": 24525
+      }
+    },
+    "degraded_rate": 0.0179,
+    "degraded_reasons": {
+      "draft_llm_unavailable": 1
+    },
+    "llm_fallback_calls": 36
+  },
+  "retrieval": {
+    "dense": {
+      "kb_recall@5": 1.0,
+      "kb_mrr@10": 0.8802,
+      "ticket_intent_hit@5": 1.0,
+      "cases": 48
+    },
+    "sparse": {
+      "kb_recall@5": 0.5833,
+      "kb_mrr@10": 0.4464,
+      "ticket_intent_hit@5": 0.8542,
+      "cases": 48
+    },
+    "hybrid": {
+      "kb_recall@5": 0.9792,
+      "kb_mrr@10": 0.8351,
+      "ticket_intent_hit@5": 1.0,
+      "cases": 48
+    },
+    "hybrid_rerank": {
+      "kb_recall@5": 1.0,
+      "kb_mrr@10": 0.8497,
+      "ticket_intent_hit@5": 1.0,
+      "cases": 48
+    }
+  },
+  "config": {
+    "database": "postgres (neon)",
+    "vector_backend": "qdrant",
+    "embed_provider": "jina",
+    "embed_model": "jina-embeddings-v3",
+    "rerank_model": "jina-reranker-v2-base-multilingual",
+    "llm_chains": {
+      "triage": [
+        "gemini:gemini-3.5-flash-lite",
+        "gemini:gemini-3.1-flash-lite",
+        "groq:openai/gpt-oss-20b",
+        "groq:openai/gpt-oss-120b"
+      ],
+      "draft": [
+        "groq:openai/gpt-oss-120b",
+        "groq:openai/gpt-oss-20b",
+        "gemini:gemini-3.1-flash-lite",
+        "gemini:gemini-3.5-flash-lite"
+      ],
+      "assist": [
+        "groq:openai/gpt-oss-120b",
+        "groq:openai/gpt-oss-20b",
+        "gemini:gemini-3.1-flash-lite"
+      ],
+      "judge": [
+        "groq:qwen/qwen3.8-27b",
+        "gemini:gemini-3.5-flash-lite"
+      ]
+    },
+    "cache": "upstash",
+    "queue": "in-process",
+    "email_transport": "outbox",
+    "langfuse": true,
+    "otel": true,
+    "deploy_mode": "monolith",
+    "thresholds": {
+      "min_retrieval_score": 0.3,
+      "strong_match_score": 0.62,
+      "min_draft_confidence": 0.55,
+      "self_service_min_confidence": 0.62,
+      "self_service_min_recurrence": 3,
+      "clarify_target_posterior": 0.8,
+      "ood_similarity": 0.45
+    }
+  },
+  "errors": []
+}

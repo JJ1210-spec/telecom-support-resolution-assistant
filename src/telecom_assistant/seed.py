@@ -1,93 +1,77 @@
-"""Load the synthetic corpus and replay versioned update events locally."""
+"""Load the synthetic corpus (taxonomy, KB with customer self-help sections, resolved/unresolved tickets) and
+replay versioned update events through the same indexer used for live data."""
 
 from __future__ import annotations
 
-import argparse
-import asyncio
 import json
+from importlib import resources
 from pathlib import Path
 
-from .config import Settings
-from .knowledge import KnowledgeStore, document_text
-from .ollama import OllamaClient
+from .config import ROOT
+from .services import Services
 
-ROOT = Path(__file__).resolve().parents[2]
 DATA = ROOT / "data" / "synthetic" / "v1"
 
 
-def read_jsonl(name: str) -> list[dict]:
-    return [json.loads(line) for line in (DATA / name).read_text(encoding="utf-8").splitlines()]
+def read_jsonl(name: str, base: Path = DATA) -> list[dict]:
+    return [json.loads(line) for line in (base / name).read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
-async def ingest_batch(store: KnowledgeStore, model: OllamaClient, kind: str, records: list[dict]) -> dict:
-    counts = {"inserted": 0, "updated": 0, "unchanged": 0}
-    for start in range(0, len(records), 16):
-        batch = records[start : start + 16]
-        vectors = await model.embed_many([document_text(kind, row) for row in batch])
-        for row, vector in zip(batch, vectors):
-            counts[store.upsert(kind, row, vector)] += 1
-    return counts
+def self_help() -> dict[str, list[str]]:
+    raw = json.loads(resources.files("telecom_assistant.resources").joinpath("kb_self_help.json")
+                     .read_text(encoding="utf-8"))
+    return {k: v for k, v in raw.items() if not k.startswith("_")}
 
 
-async def bootstrap(settings: Settings) -> None:
-    store = KnowledgeStore(settings.knowledge_db, settings.embed_model)
-    model = OllamaClient(settings.ollama_url, settings.embed_model, settings.chat_model)
-    resolved = read_jsonl("resolved_tickets.jsonl")
-    unresolved = read_jsonl("unresolved_tickets.jsonl")
-    articles = read_jsonl("kb_articles.jsonl")
-    for intent, info in json.loads((DATA / "manifest.json").read_text(encoding="utf-8"))["intents"].items():
-        example = next(row for row in resolved if row["intent"] == intent)
-        from .knowledge import TaxonomyInput
-
-        if not any(item["intent"] == intent for item in store.taxonomy()):
-            store.upsert_taxonomy(TaxonomyInput(
-                intent=intent, category=example["category"], product=info["product"],
-                description=intent.replace(".", " ").replace("_", " "),
-            ))
-    for name, kind, rows in [
-        ("resolved", "ticket", resolved), ("unresolved", "ticket", unresolved), ("kb", "kb", articles)
-    ]:
-        print(name, await ingest_batch(store, model, kind, rows))
-    print("counts", store.counts())
+def kb_records() -> list[dict]:
+    helps = self_help()
+    return [{"kb_id": a["kb_id"], "version": a["article_version"], "title": a["title"], "product": a["product"],
+             "intent": a["intent"], "summary": a["summary"], "checks": a["checks"],
+             "self_help": helps.get(a["kb_id"], []), "escalation": a["escalation_criteria"],
+             "status": a["status"], "origin": "seed"} for a in read_jsonl("kb_articles.jsonl")]
 
 
-async def apply_updates(settings: Settings) -> None:
-    store = KnowledgeStore(settings.knowledge_db, settings.embed_model)
-    model = OllamaClient(settings.ollama_url, settings.embed_model, settings.chat_model)
-    events = read_jsonl("update_events.jsonl")
-    for event in events:
-        current = store.get_record(event["entity_id"])
-        if current is None:
-            raise ValueError(f"Cannot update missing record {event['entity_id']}; run bootstrap first")
-        updated = dict(current)
+async def bootstrap(services: Services) -> dict:
+    added = services.registry.seed()
+    await services.indexer.ensure()
+    kb = {"inserted": 0, "updated": 0, "unchanged": 0, "status_changed": 0}
+    for article in kb_records():
+        kb[await services.indexer.upsert_kb(article, actor="seed")] += 1
+    resolved = await services.indexer.index_tickets(read_jsonl("resolved_tickets.jsonl"))
+    unresolved = await services.indexer.index_tickets(read_jsonl("unresolved_tickets.jsonl"))
+    return {"taxonomy_added": added, "kb": kb, "resolved": resolved.as_dict(), "unresolved": unresolved.as_dict(),
+            "index_counts": {"tickets": await services.index.count("tickets"), "kb": await services.index.count("kb")}}
+
+
+async def apply_updates(services: Services) -> list[dict]:
+    """Replay update_events.jsonl: unresolved -> resolved transitions, a KB edit and a KB deprecation."""
+    import sqlalchemy as sa
+
+    from .db import corpus_tickets, kb_articles
+
+    results = []
+    for event in read_jsonl("update_events.jsonl"):
         if event["entity_type"] == "ticket":
-            updated["record_version"] = event["new_version"]
-            updated["status"] = event["new_status"]
-            updated["resolved_at"] = event["effective_at"]
-            updated["resolution_steps"] = event["resolution_steps"]
-            updated["resolution_summary"] = event["resolution_summary"]
-            updated["closure_evidence"] = event["closure_evidence"]
-            updated["resolution_outcome"] = "verified_fixed_synthetic"
-            kind = "ticket"
+            with services.db.read() as con:
+                row = con.execute(sa.select(corpus_tickets.c.payload).where(
+                    corpus_tickets.c.ticket_id == event["entity_id"])).first()
+            if not row:
+                results.append({"event": event["event_id"], "result": "missing"})
+                continue
+            updated = {**row.payload, "record_version": event["new_version"], "status": event["new_status"],
+                       "resolved_at": event["effective_at"], "resolution_steps": event["resolution_steps"],
+                       "resolution_summary": event["resolution_summary"],
+                       "closure_evidence": event["closure_evidence"]}
+            report = await services.indexer.index_tickets([updated])
+            results.append({"event": event["event_id"], "result": report.as_dict()})
         else:
-            updated["article_version"] = event["new_version"]
-            updated["status"] = event["new_status"]
-            updated["updated_at"] = event["effective_at"]
+            with services.db.read() as con:
+                row = con.execute(sa.select(kb_articles).where(kb_articles.c.kb_id == event["entity_id"])).first()
+            if not row:
+                results.append({"event": event["event_id"], "result": "missing"})
+                continue
+            article = {**dict(row._mapping), "version": event["new_version"], "status": event["new_status"]}
             if "checks" in event:
-                updated["checks"] = event["checks"]
-            kind = "kb"
-        vector = (await model.embed_many([document_text(kind, updated)]))[0]
-        print(event["event_id"], store.upsert(kind, updated, vector))
-    print("counts", store.counts())
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=["bootstrap", "updates"])
-    args = parser.parse_args()
-    settings = Settings.from_env()
-    asyncio.run(bootstrap(settings) if args.action == "bootstrap" else apply_updates(settings))
-
-
-if __name__ == "__main__":
-    main()
+                article["checks"] = event["checks"]
+            results.append({"event": event["event_id"], "result": await services.indexer.upsert_kb(article)})
+    return results
