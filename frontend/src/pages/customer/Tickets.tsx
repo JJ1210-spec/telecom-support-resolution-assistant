@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, NavLink, Outlet, useParams } from "react-router-dom";
 import { api } from "../../api/client";
 import type { CustomerTicket, Step, TicketRow } from "../../api/types";
 import { Composer, Thread } from "../../components/Chat";
@@ -7,56 +7,82 @@ import { Icon } from "../../components/Icon";
 import { ago, Empty, ErrorNote, SeverityBadge, Spinner, StatusBadge, Toast, useToast } from "../../components/ui";
 import { useLiveEvents, useResource } from "../../hooks/useLive";
 
-export function MyTickets() {
+/* ------------------------------------------------------------------ inbox shell (list rail + workspace) */
+export function CustomerInbox() {
+  const { id } = useParams();
   const list = useResource(() => api.get<{ tickets: TicketRow[] }>("/v1/tickets"), []);
+  const [filter, setFilter] = useState<"open" | "all">("open");
   useLiveEvents(() => void list.reload());
-  const tickets = list.data?.tickets ?? [];
+  const tickets = (list.data?.tickets ?? []).filter((t) => filter === "all" || !["resolved", "closed"].includes(t.status));
   return (
-    <div className="container page stack-lg">
-      <div className="row-between">
-        <div>
-          <div className="eyebrow">Support</div>
-          <h1 className="display-sm" style={{ marginTop: 6 }}>Your tickets</h1>
+    <div className={`split${id ? " has-selection" : ""}`}>
+      <aside className="rail" aria-label="Your tickets">
+        <div className="rail-head">
+          <div className="row-between">
+            <h1 className="title-md">Your tickets</h1>
+            <Link to="/tickets/new" className="btn btn-primary btn-sm"><Icon name="plus" size={16} /> New</Link>
+          </div>
+          <div className="seg" role="tablist" aria-label="Filter tickets">
+            <button className={filter === "open" ? "on-worked" : ""} onClick={() => setFilter("open")}>Open</button>
+            <button className={filter === "all" ? "on-worked" : ""} onClick={() => setFilter("all")}>All</button>
+          </div>
         </div>
-        <Link to="/tickets/new" className="btn btn-primary">
-          <Icon name="plus" size={18} /> Get help
-        </Link>
-      </div>
-      {list.loading && <Spinner />}
-      <ErrorNote error={list.error} />
-      {!list.loading && !tickets.length && (
-        <div className="card">
-          <Empty title="No tickets yet">Tell us what's wrong and we'll get you sorted.</Empty>
-        </div>
-      )}
-      <div className="stack-sm">
-        {tickets.map((t) => (
-          <Link key={t.id} to={`/tickets/${t.id}`} className="card-sm card-hover row-between" style={{ color: "inherit", textDecoration: "none" }}>
-            <div className="grow">
-              <div className="row">
+        <div className="rail-list">
+          {list.loading && !list.data && <div style={{ padding: 16 }}><Spinner /></div>}
+          <ErrorNote error={list.error} />
+          {!list.loading && tickets.length === 0 && (
+            <p className="caption" style={{ padding: "12px 14px" }}>
+              {filter === "open" ? "No open tickets." : "No tickets yet."}
+            </p>
+          )}
+          {tickets.map((t) => (
+            <NavLink key={t.id} to={`/tickets/${t.id}`} className={({ isActive }) => `rail-item${isActive ? " active" : ""}`}>
+              <div className="row-between" style={{ gap: 8 }}>
                 <span className="mono caption">{t.id}</span>
-                <SeverityBadge level={t.severity} />
+                <span className="caption">{ago(t.updated_at)}</span>
               </div>
               <div className="title-sm" style={{ marginTop: 6 }}>{t.intent_label || t.subject}</div>
-              <div className="caption" style={{ marginTop: 2 }}>Updated {ago(t.updated_at)}</div>
-            </div>
-            <StatusBadge status={t.status} label={t.status_label} />
-          </Link>
-        ))}
-      </div>
+              <div className="row" style={{ marginTop: 8, gap: 6 }}>
+                <StatusBadge status={t.status} label={t.status_label} />
+                <SeverityBadge level={t.severity} />
+              </div>
+            </NavLink>
+          ))}
+        </div>
+      </aside>
+      <Outlet />
     </div>
   );
 }
 
+export function InboxHome() {
+  return (
+    <section className="workspace">
+      <div className="ws-scroll" style={{ display: "grid", placeItems: "center" }}>
+        <div style={{ textAlign: "center", maxWidth: 420, padding: 32 }}>
+          <span className="icon-plate" style={{ margin: "0 auto", width: 56, height: 56 }}><Icon name="inbox" size={26} /></span>
+          <h2 className="title-lg" style={{ marginTop: 20 }}>Select a ticket</h2>
+          <p className="muted" style={{ margin: "10px 0 24px" }}>
+            Pick a ticket on the left to see its steps and conversation, or tell us about a new problem.
+          </p>
+          <Link to="/tickets/new" className="btn btn-primary">Get help with something new</Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ ticket workspace */
 const STAGES = ["Received", "Diagnosed", "Being solved", "Confirm fix", "Resolved"];
 function stageOf(status: string): number {
   return { analyzing: 0, self_service: 2, escalated: 1, in_progress: 2, awaiting_customer: 2, solution_proposed: 3, resolved: 4, closed: 4 }[status] ?? 0;
 }
 const PROGRESS_TEXT: Record<string, string> = {
-  retrieving: "Searching thousands of past cases…",
+  retrieving: "Searching past cases like yours…",
   triaging: "Understanding your issue…",
-  drafting: "Preparing grounded steps…",
+  drafting: "Preparing step-by-step help…",
 };
+type Tab = "steps" | "timeline" | "details";
 
 export function TicketDetail() {
   const { id = "" } = useParams();
@@ -66,6 +92,7 @@ export function TicketDetail() {
   const [busy, setBusy] = useState(false);
   const [toast, showToast] = useToast();
   const [reopenOpen, setReopenOpen] = useState(false);
+  const [tab, setTab] = useState<Tab>("steps");
 
   useLiveEvents((event) => {
     if (event.ticket_id !== id) return;
@@ -86,197 +113,194 @@ export function TicketDetail() {
     }
   };
 
-  if (ticket.loading && !t) return <div className="container page"><Spinner /></div>;
-  if (!t) return <div className="container page"><ErrorNote error={ticket.error ?? "Ticket not found"} /></div>;
+  if (!t) {
+    return (
+      <section className="workspace" style={{ display: "grid", placeItems: "center" }}>
+        {ticket.loading ? <Spinner /> : <ErrorNote error={ticket.error ?? "Ticket not found"} />}
+      </section>
+    );
+  }
 
   const analyzing = t.analysis_state === "running";
   const open = !["resolved", "closed"].includes(t.status);
   const anyWorked = t.steps.some((s) => s.status === "worked");
   const generalMessages = t.messages.filter((m) => !m.step_id);
   const current = stageOf(t.status);
+  const canReopen = ["self_service", "solution_proposed", "awaiting_customer", "resolved"].includes(t.status);
 
   return (
-    <div className="container page stack-lg">
-      <Link to="/tickets" className="btn btn-text" style={{ alignSelf: "flex-start", color: "var(--body)" }}>
-        <Icon name="back" size={16} /> All tickets
-      </Link>
-
-      <section className="status-hero">
-        <div className="row-between">
-          <span className="mono meta">{t.id}</span>
-          <span className="row">
-            {t.issue && <SeverityBadge level={t.issue.severity} />}
-            <StatusBadge status={t.status} label={t.status_label} />
-          </span>
+    <section className="workspace" aria-label={`Ticket ${t.id}`}>
+      <header className="ws-head">
+        <Link to="/tickets" className="btn btn-text only-mobile" style={{ color: "var(--body)", marginBottom: 8 }}>
+          <Icon name="back" size={16} /> All tickets
+        </Link>
+        <div className="row-between" style={{ alignItems: "flex-start" }}>
+          <div className="grow">
+            <div className="row" style={{ gap: 8 }}>
+              <span className="mono caption">{t.id}</span>
+              <StatusBadge status={t.status} label={t.status_label} />
+              {t.issue && <SeverityBadge level={t.issue.severity} />}
+            </div>
+            <h1 className="title-lg" style={{ marginTop: 8 }}>{t.issue?.label || t.subject}</h1>
+            <div className="row caption" style={{ marginTop: 8, gap: 12 }}>
+              <span className="mini-progress" aria-label={`Stage: ${STAGES[current]}`}>
+                {STAGES.map((s, i) => <span key={s} className={i < current ? "done" : i === current ? "now" : ""} />)}
+              </span>
+              <span>{STAGES[current]}</span>
+              <span>· Opened {ago(t.created_at)}</span>
+              {t.assignee && <span>· Handled by {t.assignee}</span>}
+              {t.reopen_count > 0 && <span>· Reopened {t.reopen_count}×</span>}
+            </div>
+          </div>
+          {open && !analyzing && (
+            <div className="row">
+              {canReopen && (
+                <button className="btn btn-secondary btn-sm" disabled={busy} onClick={() => setReopenOpen(true)}>Still not working</button>
+              )}
+              <button className="btn btn-primary btn-sm" disabled={busy}
+                onClick={() => act(() => api.post(`/v1/tickets/${t.id}/confirm`, { solved: true }), "Ticket resolved — thank you!")}>
+                <Icon name="check" size={16} /> It's solved
+              </button>
+            </div>
+          )}
+          {!open && t.status === "resolved" && (
+            <button className="btn btn-secondary btn-sm" disabled={busy} onClick={() => setReopenOpen(true)}>Problem came back? Reopen</button>
+          )}
         </div>
-        <h1 className="display-sm" style={{ marginTop: 14 }}>{t.issue?.label || t.subject}</h1>
-        <p className="meta" style={{ marginTop: 8 }}>
-          Opened {ago(t.created_at)}
-          {t.assignee ? ` · Handled by ${t.assignee}` : ""}
-          {t.reopen_count ? ` · Reopened ${t.reopen_count}×` : ""}
-        </p>
-        <div className="progress-track">
-          {STAGES.map((s, i) => <span key={s} className={i < current ? "done" : i === current ? "now" : ""} title={s} />)}
-        </div>
-        <div className="row-between meta" style={{ marginTop: 8, fontSize: 12 }}>
-          {STAGES.map((s) => <span key={s}>{s}</span>)}
-        </div>
-      </section>
+      </header>
 
       {analyzing && (
-        <div className="card row">
-          <Spinner />
-          <div>
-            <div className="title-sm pulse">{PROGRESS_TEXT[stage ?? ""] ?? "Analyzing your request…"}</div>
-            <div className="caption">This usually takes a few seconds. Your ticket is already saved and you'll get an email.</div>
-          </div>
-        </div>
+        <div className="ws-strip"><Spinner /> <span className="pulse">{PROGRESS_TEXT[stage ?? ""] ?? "Analysing your request…"}</span>
+          <span className="caption">Your ticket is saved and you'll get an email.</span></div>
       )}
-
       {t.incident && (
-        <div className="alert alert-medium">
-          <Icon name="radar" />
-          <div>
-            <strong>{t.incident.status === "resolved" ? "Area issue resolved" : "Known issue in your area"}</strong>
-            <div>{t.incident.public_note}</div>
-          </div>
-        </div>
+        <div className="ws-strip warn"><Icon name="radar" size={18} />
+          <span><strong>{t.incident.status === "resolved" ? "Area issue resolved: " : "Known issue in your area: "}</strong>{t.incident.public_note}</span></div>
+      )}
+      {!analyzing && t.why && !t.incident && (
+        <div className="ws-strip"><Icon name={t.route === "self_service" ? "bolt" : "user"} size={18} /><span>{t.why}</span></div>
       )}
 
-      <div className="grid-2" style={{ gridTemplateColumns: "minmax(0, 1.4fr) minmax(0, 1fr)", alignItems: "start" }}>
-        <div className="stack-lg">
-          {t.why && !analyzing && (
-            <div className="card-flat">
-              <div className="row">
-                <span className="icon-plate blue"><Icon name={t.route === "self_service" ? "bolt" : "user"} /></span>
-                <div className="grow">
-                  <div className="title-sm">{t.route === "self_service" ? "Quick fix available" : t.route === "assisted" ? "Specialist + quick checks" : "With a specialist"}</div>
-                  <div className="muted body-sm">{t.why}</div>
-                </div>
-              </div>
+      <div className="ws-body">
+        <div className="panel">
+          <div className="panel-head">
+            <div className="tabs" role="tablist">
+              <button className={`tab${tab === "steps" ? " active" : ""}`} onClick={() => setTab("steps")}>
+                {t.steps[0]?.origin === "agent" ? "Solution" : "Steps"}<span className="count">{t.steps.length}</span>
+              </button>
+              <button className={`tab${tab === "timeline" ? " active" : ""}`} onClick={() => setTab("timeline")}>Timeline</button>
+              <button className={`tab${tab === "details" ? " active" : ""}`} onClick={() => setTab("details")}>Details</button>
             </div>
-          )}
-
-          {t.steps.length > 0 && (
-            <section className="card">
-              <div className="row-between">
-                <h2 className="title-md">{t.steps[0].origin === "agent" ? "Your specialist's solution" : "Try these steps"}</h2>
-                <span className="caption">Tick each one as you go</span>
-              </div>
-              <div style={{ marginTop: 8 }}>
-                {t.steps.map((s) => (
-                  <StepRow
-                    key={s.id}
-                    step={s}
-                    disabled={busy || !open}
-                    chatCount={t.messages.filter((m) => m.step_id === s.id).length}
-                    onStatus={(status) =>
-                      act(() => api.post(`/v1/tickets/${t.id}/steps/${s.id}/feedback`, { status }),
-                        status === "worked" ? "Great — glad that helped" : status === "did_not_work" ? "Thanks — noted for your specialist" : undefined)
-                    }
-                    onChat={() => setChatStep(s)}
-                  />
+          </div>
+          <div className="panel-body">
+            {tab === "steps" && (
+              <StepsTab ticket={t} busy={busy} open={open} anyWorked={anyWorked} onChat={setChatStep}
+                onStatus={(s, status) => act(() => api.post(`/v1/tickets/${t.id}/steps/${s.id}/feedback`, { status }),
+                  status === "worked" ? "Great — glad that helped" : status === "did_not_work" ? "Thanks — noted for your specialist" : undefined)}
+                onSolved={() => act(() => api.post(`/v1/tickets/${t.id}/confirm`, { solved: true }), "Ticket resolved — thank you!")}
+                onSpecialist={() => act(() => api.post(`/v1/tickets/${t.id}/escalate`, { text: "Customer asked for a specialist" }), "A specialist will take it from here")}
+                onRate={(rating) => act(() => api.post(`/v1/tickets/${t.id}/feedback`, { rating }), "Thanks for the feedback")} />
+            )}
+            {tab === "timeline" && (
+              <div className="timeline">
+                {t.events.map((e, i) => (
+                  <div key={i} className={`tl-item${["created", "resolved", "reopened", "escalated"].includes(e.kind) ? " key" : ""}`}>
+                    <div>{describeEvent(e.kind, e.detail)}</div>
+                    <div className="caption">{ago(e.created_at)}</div>
+                  </div>
                 ))}
               </div>
-              {open && anyWorked && (
-                <div className="alert alert-info" style={{ marginTop: 16, alignItems: "center" }}>
-                  <Icon name="check" />
-                  <span className="grow">One of the steps worked. Is your issue completely solved?</span>
-                  <button className="btn btn-sm btn-primary" disabled={busy} onClick={() => act(() => api.post(`/v1/tickets/${t.id}/confirm`, { solved: true }), "Ticket resolved — thank you!")}>
-                    Yes, it's solved
-                  </button>
-                </div>
-              )}
-            </section>
-          )}
-
-          <section className="card stack">
-            <h2 className="title-md">Conversation</h2>
-            {generalMessages.length ? (
-              <Thread
-                messages={generalMessages}
-                viewer="customer"
-                disabled={busy}
-                onQuickReply={(option) => act(() => api.post(`/v1/tickets/${t.id}/messages`, { body: option, answered_option: option }))}
-              />
-            ) : (
-              <p className="muted body-sm">No messages yet.</p>
             )}
-            {t.status !== "closed" && (
-              <Composer busy={busy} placeholder="Message support…" onSend={(body) => act(() => api.post(`/v1/tickets/${t.id}/messages`, { body }), "Message sent")} />
+            {tab === "details" && (
+              <dl className="kv">
+                <dt>Your message</dt><dd style={{ whiteSpace: "pre-wrap" }}>{t.complaint}</dd>
+                <dt>Issue</dt><dd>{t.issue?.label ?? "Being diagnosed"}</dd>
+                <dt>Product</dt><dd>{t.issue?.product ?? "—"}</dd>
+                <dt>Priority</dt><dd>{t.issue?.severity ?? "—"}</dd>
+                <dt>Area</dt><dd>{t.region ?? "—"}</dd>
+                <dt>Target response</dt><dd>{t.sla_due_at ? new Date(t.sla_due_at).toLocaleString() : "—"}</dd>
+              </dl>
             )}
-          </section>
+          </div>
         </div>
 
-        <aside className="stack-lg">
-          {open && !analyzing && (
-            <div className="card stack">
-              <h2 className="title-md">Is it fixed?</h2>
-              <button className="btn btn-primary btn-block" disabled={busy} onClick={() => act(() => api.post(`/v1/tickets/${t.id}/confirm`, { solved: true }), "Ticket resolved — thank you!")}>
-                Yes, my issue is solved
-              </button>
-              {["self_service", "solution_proposed", "awaiting_customer"].includes(t.status) && (
-                <button className="btn btn-secondary btn-block" disabled={busy} onClick={() => setReopenOpen(true)}>
-                  No, it's still not working
-                </button>
-              )}
-              {t.status === "self_service" && (
-                <button className="btn btn-text" disabled={busy} onClick={() => act(() => api.post(`/v1/tickets/${t.id}/escalate`, { text: "Customer asked for a specialist" }), "A specialist will take it from here")}>
-                  Talk to a specialist instead
-                </button>
-              )}
-              <p className="caption">Your ticket stays open until you confirm it's solved.</p>
-            </div>
-          )}
-
-          {!open && (
-            <div className="card stack">
-              <span className="badge badge-green" style={{ alignSelf: "flex-start" }}>Resolved {ago(t.resolved_at)}</span>
-              {t.resolution?.root_cause && (
-                <div>
-                  <div className="caption">What caused it</div>
-                  <div>{t.resolution.root_cause}</div>
-                </div>
-              )}
-              <Rating ticket={t} onRate={(rating) => act(() => api.post(`/v1/tickets/${t.id}/feedback`, { rating }), "Thanks for the feedback")} />
-              {t.status === "resolved" && (
-                <button className="btn btn-secondary" disabled={busy} onClick={() => setReopenOpen(true)}>
-                  Problem came back? Reopen
-                </button>
-              )}
-            </div>
-          )}
-
-          <div className="card stack">
-            <h2 className="title-md">Timeline</h2>
-            <div className="timeline">
-              {t.events.map((e, i) => (
-                <div key={i} className={`tl-item${["created", "resolved", "reopened", "escalated"].includes(e.kind) ? " key" : ""}`}>
-                  <div>{describeEvent(e.kind, e.detail)}</div>
-                  <div className="caption">{ago(e.created_at)}</div>
-                </div>
-              ))}
-            </div>
+        <div className="panel soft">
+          <div className="panel-head plain">
+            <h2 className="title-sm">Conversation</h2>
+            <span className="caption">{t.assignee ? `with ${t.assignee}` : "Support team"}</span>
           </div>
-          <details className="card-sm">
-            <summary className="title-sm" style={{ cursor: "pointer" }}>Your original message</summary>
-            <p className="muted body-sm" style={{ whiteSpace: "pre-wrap", marginTop: 12 }}>{t.complaint}</p>
-          </details>
-        </aside>
+          <div className="panel-body">
+            {generalMessages.length ? (
+              <Thread messages={generalMessages} viewer="customer" disabled={busy}
+                onQuickReply={(option) => act(() => api.post(`/v1/tickets/${t.id}/messages`, { body: option, answered_option: option }))} />
+            ) : <p className="muted body-sm">No messages yet.</p>}
+          </div>
+          {t.status !== "closed" && (
+            <div className="panel-foot">
+              <Composer busy={busy} placeholder="Message support…"
+                onSend={(body) => act(() => api.post(`/v1/tickets/${t.id}/messages`, { body }), "Message sent")} />
+            </div>
+          )}
+        </div>
       </div>
 
       {chatStep && <StepChatDrawer ticket={t} step={chatStep} onClose={() => setChatStep(null)} onUpdate={(next) => ticket.setData(next)} />}
       {reopenOpen && (
-        <ReopenDialog
-          busy={busy}
-          onCancel={() => setReopenOpen(false)}
+        <ReopenDialog busy={busy} onCancel={() => setReopenOpen(false)}
           onSubmit={async (note) => {
             setReopenOpen(false);
             await act(() => api.post(`/v1/tickets/${t.id}/confirm`, { solved: false, note }), "Sent back to a specialist");
-          }}
-        />
+          }} />
       )}
       <Toast message={toast} />
+    </section>
+  );
+}
+
+function StepsTab({ ticket: t, busy, open, anyWorked, onStatus, onChat, onSolved, onSpecialist, onRate }: {
+  ticket: CustomerTicket; busy: boolean; open: boolean; anyWorked: boolean;
+  onStatus: (s: Step, status: Step["status"]) => void; onChat: (s: Step) => void; onSolved: () => void;
+  onSpecialist: () => void; onRate: (rating: number) => void;
+}) {
+  return (
+    <div className="stack">
+      {!open && (
+        <div className="card-flat stack-sm" style={{ padding: 24 }}>
+          <span className="badge badge-green" style={{ alignSelf: "flex-start" }}>Resolved {ago(t.resolved_at)}</span>
+          {t.resolution?.root_cause && <div><div className="caption">What caused it</div><div>{t.resolution.root_cause}</div></div>}
+          <Rating ticket={t} onRate={onRate} />
+        </div>
+      )}
+      {t.analysis_state === "running" && <p className="muted body-sm">Steps will appear here in a few seconds.</p>}
+      {t.analysis_state !== "running" && t.steps.length === 0 && (
+        <Empty title="A specialist is on it">
+          This issue needs a person to look at it. You'll get a reply in the conversation and by email.
+        </Empty>
+      )}
+      {t.steps.length > 0 && (
+        <>
+          <p className="caption">Tick each step as you try it. Stuck? Use “Ask about this step”.</p>
+          <div>
+            {t.steps.map((s) => (
+              <StepRow key={s.id} step={s} disabled={busy || !open}
+                chatCount={t.messages.filter((m) => m.step_id === s.id).length}
+                onStatus={(status) => onStatus(s, status)} onChat={() => onChat(s)} />
+            ))}
+          </div>
+          {open && anyWorked && (
+            <div className="alert alert-info" style={{ alignItems: "center" }}>
+              <Icon name="check" />
+              <span className="grow">One of the steps worked. Is your issue completely solved?</span>
+              <button className="btn btn-sm btn-primary" disabled={busy} onClick={onSolved}>Yes, it's solved</button>
+            </div>
+          )}
+          {open && t.status === "self_service" && (
+            <button className="btn btn-text" style={{ alignSelf: "flex-start" }} disabled={busy} onClick={onSpecialist}>
+              Rather talk to a specialist?
+            </button>
+          )}
+        </>
+      )}
     </div>
   );
 }
@@ -310,6 +334,17 @@ function StepChatDrawer({ ticket, step, onClose, onUpdate }: { ticket: CustomerT
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const messages = ticket.messages.filter((m) => m.step_id === step.id);
+  const send = async (text: string) => {
+    setBusy(true);
+    setError(null);
+    try {
+      onUpdate(await api.post<CustomerTicket>(`/v1/tickets/${ticket.id}/steps/${step.id}/chat`, { text }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to send");
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
     <>
       <div className="drawer-backdrop" onClick={onClose} />
@@ -322,17 +357,12 @@ function StepChatDrawer({ ticket, step, onClose, onUpdate }: { ticket: CustomerT
           <button className="btn btn-secondary btn-sm" onClick={onClose} aria-label="Close"><Icon name="x" size={16} /></button>
         </div>
         <div className="drawer-body">
-          {messages.length ? (
-            <Thread messages={messages} viewer="customer" />
-          ) : (
+          {messages.length ? <Thread messages={messages} viewer="customer" /> : (
             <div className="stack-sm">
               <p className="muted body-sm">Stuck on this step? Ask anything about it — where a button is, what a light means, or what to do next.</p>
               <div className="chips">
                 {["Where do I find this?", "What should I see if it worked?", "I can't do this step"].map((q) => (
-                  <button key={q} className="chip" disabled={busy} onClick={async () => {
-                    setBusy(true);
-                    try { onUpdate(await api.post<CustomerTicket>(`/v1/tickets/${ticket.id}/steps/${step.id}/chat`, { text: q })); } catch (err) { setError(err instanceof Error ? err.message : "Failed"); } finally { setBusy(false); }
-                  }}>{q}</button>
+                  <button key={q} className="chip" disabled={busy} onClick={() => void send(q)}>{q}</button>
                 ))}
               </div>
             </div>
@@ -341,21 +371,7 @@ function StepChatDrawer({ ticket, step, onClose, onUpdate }: { ticket: CustomerT
           <ErrorNote error={error} />
         </div>
         <div className="drawer-foot">
-          <Composer
-            busy={busy}
-            placeholder="Ask about this step…"
-            onSend={async (text) => {
-              setBusy(true);
-              setError(null);
-              try {
-                onUpdate(await api.post<CustomerTicket>(`/v1/tickets/${ticket.id}/steps/${step.id}/chat`, { text }));
-              } catch (err) {
-                setError(err instanceof Error ? err.message : "Failed to send");
-              } finally {
-                setBusy(false);
-              }
-            }}
-          />
+          <Composer busy={busy} placeholder="Ask about this step…" onSend={send} />
         </div>
       </aside>
     </>

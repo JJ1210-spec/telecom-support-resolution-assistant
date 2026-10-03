@@ -18,7 +18,11 @@ export function Thread({
   disabled?: boolean;
 }) {
   const end = useRef<HTMLDivElement>(null);
-  useEffect(() => end.current?.scrollIntoView({ block: "nearest" }), [messages.length]);
+  // Braces matter: newer browsers return a Promise from scrollIntoView, and React would call any value an effect
+  // returns as its cleanup function -> "c is not a function" -> blank page.
+  useEffect(() => {
+    end.current?.scrollIntoView({ block: "end" });
+  }, [messages.length]);
   const lastOptionsIndex = [...messages].reverse().findIndex((m) => m.options && m.options.length);
   const pendingIndex = lastOptionsIndex === -1 ? -1 : messages.length - 1 - lastOptionsIndex;
   const answered = pendingIndex >= 0 && messages.slice(pendingIndex + 1).some((m) => m.author_role === "customer");

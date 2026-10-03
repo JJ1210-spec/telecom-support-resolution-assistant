@@ -2,14 +2,16 @@ import { StrictMode, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import "./styles/app.css";
-import { ConsoleLayout, SiteLayout } from "./components/Layout";
+import "./styles/layout.css";
+import { AppLayout, ConsoleLayout, SiteLayout } from "./components/Layout";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Spinner } from "./components/ui";
 import { AuthProvider, homeFor, useAuth } from "./hooks/useAuth";
 import type { Role } from "./api/types";
 import Landing from "./pages/Landing";
 import { Login, Register } from "./pages/Auth";
 import NewTicket from "./pages/customer/NewTicket";
-import { MyTickets, TicketDetail } from "./pages/customer/Tickets";
+import { CustomerInbox, InboxHome, TicketDetail } from "./pages/customer/Tickets";
 import AgentTicket from "./pages/agent/AgentTicket";
 import { IncidentsPage, OverviewPage, PlaygroundPage, QueuePage } from "./pages/agent/Console";
 import { DriftPage, HealthPage, KnowledgePage, TaxonomyPage } from "./pages/admin/Admin";
@@ -31,6 +33,15 @@ function GuestOnly({ children }: { children: ReactNode }) {
 
 const STAFF: Role[] = ["agent", "admin"];
 
+function Root() {
+  const location = useLocation();
+  return (
+    <ErrorBoundary resetKey={location.pathname}>
+      <App />
+    </ErrorBoundary>
+  );
+}
+
 function App() {
   return (
     <Routes>
@@ -38,9 +49,13 @@ function App() {
       <Route element={<SiteLayout />}>
         <Route path="/login" element={<GuestOnly><Login /></GuestOnly>} />
         <Route path="/register" element={<GuestOnly><Register /></GuestOnly>} />
-        <Route path="/tickets" element={<Guard roles={["customer"]}><MyTickets /></Guard>} />
-        <Route path="/tickets/new" element={<Guard roles={["customer"]}><NewTicket /></Guard>} />
-        <Route path="/tickets/:id" element={<Guard roles={["customer"]}><TicketDetail /></Guard>} />
+      </Route>
+      <Route element={<Guard roles={["customer"]}><AppLayout /></Guard>}>
+        <Route path="/tickets/new" element={<NewTicket />} />
+        <Route path="/tickets" element={<CustomerInbox />}>
+          <Route index element={<InboxHome />} />
+          <Route path=":id" element={<TicketDetail />} />
+        </Route>
       </Route>
       <Route path="/console" element={<Guard roles={STAFF}><ConsoleLayout /></Guard>}>
         <Route index element={<OverviewPage />} />
@@ -62,7 +77,7 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <BrowserRouter>
       <AuthProvider>
-        <App />
+        <Root />
       </AuthProvider>
     </BrowserRouter>
   </StrictMode>,

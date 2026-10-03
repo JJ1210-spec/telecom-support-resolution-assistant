@@ -1,8 +1,9 @@
 import { useState, type ReactNode } from "react";
-import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import { useAuth } from "../hooks/useAuth";
 import { useLiveEvents, useResource } from "../hooks/useLive";
+import { ErrorBoundary } from "./ErrorBoundary";
 import { BrandMark, Icon } from "./Icon";
 
 function initials(name?: string, email?: string) {
@@ -18,6 +19,7 @@ function initials(name?: string, email?: string) {
 export function TopNav({ dark = false }: { dark?: boolean }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   return (
     <header className={`topnav${dark ? " dark" : ""}`}>
       <div className="container">
@@ -25,14 +27,14 @@ export function TopNav({ dark = false }: { dark?: boolean }) {
           <BrandMark />
           Resolve Desk
         </Link>
-        <nav className="navlinks" aria-label="Main">
+        <nav className="navlinks hide-mobile" aria-label="Main">
           {user?.role === "customer" && (
             <>
-              <NavLink to="/tickets" end className={({ isActive }) => `navlink${isActive ? " active" : ""}`}>
+              <NavLink to="/tickets" className={({ isActive }) => `navlink${isActive && !location.pathname.endsWith("/new") ? " active" : ""}`}>
                 My tickets
               </NavLink>
               <NavLink to="/tickets/new" className={({ isActive }) => `navlink${isActive ? " active" : ""}`}>
-                Get help
+                New request
               </NavLink>
             </>
           )}
@@ -45,7 +47,7 @@ export function TopNav({ dark = false }: { dark?: boolean }) {
         <div className="row" style={{ marginLeft: "auto" }}>
           {user ? (
             <>
-              <span className="avatar" title={user.email}>
+              <span className="avatar hide-mobile" title={user.email}>
                 {initials(user.name, user.email)}
               </span>
               <button
@@ -74,14 +76,33 @@ export function TopNav({ dark = false }: { dark?: boolean }) {
   );
 }
 
+/** Normal scrolling page (sign in / register). */
 export function SiteLayout() {
+  const location = useLocation();
   return (
     <>
       <TopNav />
       <main>
-        <Outlet />
+        <ErrorBoundary resetKey={location.pathname}>
+          <Outlet />
+        </ErrorBoundary>
       </main>
     </>
+  );
+}
+
+/** Full-height app shell for the customer portal: fixed header, panels scroll on their own. */
+export function AppLayout() {
+  const location = useLocation();
+  return (
+    <div className="app">
+      <TopNav />
+      <main className="app-body">
+        <ErrorBoundary resetKey={location.pathname}>
+          <Outlet />
+        </ErrorBoundary>
+      </main>
+    </div>
   );
 }
 
@@ -99,6 +120,8 @@ const CONSOLE_LINKS: { to: string; label: string; icon: string; admin?: boolean;
 export function ConsoleLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const flush = location.pathname.startsWith("/console/tickets/");
   const [tick, setTick] = useState(0);
   const counts = useResource(() => api.get<{ counts: { human_queue: number } }>("/v1/agent/queue?scope=human"), [tick]);
   useLiveEvents((event) => {
@@ -135,8 +158,10 @@ export function ConsoleLayout() {
           <Icon name="logout" size={18} /> Sign out
         </button>
       </aside>
-      <main className="console-main">
-        <Outlet />
+      <main className={`console-main${flush ? " flush" : ""}`}>
+        <ErrorBoundary resetKey={location.pathname}>
+          <Outlet />
+        </ErrorBoundary>
       </main>
     </div>
   );

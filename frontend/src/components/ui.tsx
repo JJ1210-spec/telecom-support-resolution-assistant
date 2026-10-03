@@ -118,8 +118,20 @@ export function ErrorNote({ error }: { error: string | null }) {
 }
 
 /** Small horizontal bar chart for distributions (no chart library needed). */
-export function Bars({ rows, format = (v: number) => String(v) }: { rows: { label: string; value: number; tone?: string }[]; format?: (v: number) => string }) {
+export function Bars({ rows, format = (v: number) => String(v), stacked = false }: { rows: { label: string; value: number; tone?: string }[]; format?: (v: number) => string; stacked?: boolean }) {
   const max = Math.max(1e-9, ...rows.map((r) => r.value));
+  if (stacked) {
+    return (
+      <div className="bars-stacked">
+        {rows.map((r) => (
+          <div key={r.label} className="bar-row">
+            <div className="bar-label"><span>{r.label}</span><span className="num">{format(r.value)}</span></div>
+            <Meter value={r.value} max={max} tone={r.tone as "warn" | "bad" | undefined} />
+          </div>
+        ))}
+      </div>
+    );
+  }
   return (
     <div className="stack-sm">
       {rows.map((r) => (
