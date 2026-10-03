@@ -23,3 +23,25 @@ def test_weak_retrieval_cannot_override_model_intent() -> None:
     result, notes = reconcile_triage(triage, "My bill has an extra charge", tickets, taxonomy)
     assert result == triage
     assert notes == []
+
+
+def test_localized_wifi_coverage_is_not_treated_as_major_outage() -> None:
+    triage = {"intent": "connectivity.intermittent_drop", "category": "Technical Support",
+              "product": "Router/CPE", "severity": "P2", "confidence": 0.8}
+    result, notes = reconcile_triage(
+        triage, "The Wi-Fi signal is weak in my bedroom, but the router works in the hall.", [], []
+    )
+    assert result["severity"] == "P3"
+    assert len(notes) == 1
+
+
+def test_three_wifi_cases_can_correct_small_model_label() -> None:
+    triage = {"intent": "connectivity.intermittent_drop", "category": "Technical Support",
+              "product": "Router/CPE", "severity": "P3", "confidence": 0.8}
+    taxonomy = [{"intent": "wifi.coverage_or_interference", "category": "Technical Support",
+                 "product": "Router/CPE"}]
+    tickets = [{"score": score, "payload": {"intent": "wifi.coverage_or_interference"}}
+               for score in (0.665, 0.657, 0.651)]
+    result, notes = reconcile_triage(triage, "Weak Wi-Fi in one bedroom", tickets, taxonomy)
+    assert result["intent"] == "wifi.coverage_or_interference"
+    assert notes

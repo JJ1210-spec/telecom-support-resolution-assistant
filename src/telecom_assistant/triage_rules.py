@@ -7,7 +7,7 @@ def reconcile_triage(triage: dict, complaint: str, tickets: list[dict], taxonomy
     result = dict(triage)
     notes: list[str] = []
     known = {item["intent"]: item for item in taxonomy}
-    strong = [ticket for ticket in tickets[:3] if ticket.get("score", 0) >= 0.68]
+    strong = [ticket for ticket in tickets[:3] if ticket.get("score", 0) >= 0.64]
     labels = [ticket.get("payload", {}).get("intent") for ticket in strong]
     if len(strong) >= 3 and len(set(labels)) == 1 and labels[0] in known and labels[0] != result["intent"]:
         chosen = known[labels[0]]
@@ -32,4 +32,9 @@ def reconcile_triage(triage: dict, complaint: str, tickets: list[dict], taxonomy
     ) and any(phrase in text for phrase in ("work from home", "wfh", "घर से काम")):
         result["severity"] = "P2"
         notes.append("Severity raised to P2 by recurring work-impact rule")
+    elif result["severity"] in ("P1", "P2", "Unknown") and any(
+        word in text for word in ("weak wi-fi", "weak wifi", "wifi weak", "wi-fi signal is weak")
+    ) and any(phrase in text for phrase in ("works in the hall", "works in the living room", "works elsewhere")):
+        result["severity"] = "P3"
+        notes.append("Severity set to P3 for localized Wi-Fi coverage with service working elsewhere")
     return result, notes
