@@ -1,0 +1,31 @@
+name: nightly
+# Live evaluation, drift snapshot and new-class discovery against the hosted stack.
+# Also keeps the free Qdrant cluster active. Requires repository secrets (see .env.example).
+on:
+  schedule: [{ cron: "30 20 * * *" }]   # 02:00 IST
+  workflow_dispatch:
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      JINA_API_KEY: ${{ secrets.JINA_API_KEY }}
+      QDRANT_URL: ${{ secrets.QDRANT_URL }}
+      QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+      UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+      LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+      LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install -e .
+      - run: python -m telecom_assistant.cli check-keys
+      - run: python -m telecom_assistant.cli eval --concurrency 1
+      - run: python -m telecom_assistant.cli drift
+      - run: python -m telecom_assistant.cli discover
+      - uses: actions/upload-artifact@v4
+        with: { name: eval-report, path: reports/ }

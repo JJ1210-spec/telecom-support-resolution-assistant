@@ -1,0 +1,127 @@
+{
+  "_note": "Clarifying-question bank. For each option, `likely` lists intents for which that answer is typical. The engine turns these into P(answer | intent) and picks the question with the highest expected information gain over the current intent posterior. Data, not code: add questions without redeploying.",
+  "questions": [
+    {
+      "id": "bb_symptom", "type": "single", "kind": "diagnostic",
+      "text": "What best describes the internet problem?",
+      "scope": ["connectivity.intermittent_drop", "connectivity.slow_speed", "wifi.coverage_or_interference", "fiber.loss_of_signal", "connectivity.area_outage"],
+      "options": [
+        {"id": "drops", "label": "It keeps disconnecting and reconnecting", "likely": {"connectivity.intermittent_drop": 1}},
+        {"id": "slow", "label": "It's connected but very slow", "likely": {"connectivity.slow_speed": 1}},
+        {"id": "rooms", "label": "Wi-Fi is weak only in some rooms", "likely": {"wifi.coverage_or_interference": 1}},
+        {"id": "down", "label": "No internet at all", "likely": {"fiber.loss_of_signal": 1, "connectivity.area_outage": 1}}
+      ]
+    },
+    {
+      "id": "neighbours", "type": "single", "kind": "diagnostic",
+      "text": "Are neighbours or others in your building also affected?",
+      "scope": ["connectivity.area_outage", "fiber.loss_of_signal", "connectivity.intermittent_drop", "connectivity.slow_speed"],
+      "options": [
+        {"id": "yes", "label": "Yes, others nearby have the same problem", "likely": {"connectivity.area_outage": 1}, "facts": {"area_impact": true}},
+        {"id": "no", "label": "No, it's only us", "likely": {"fiber.loss_of_signal": 1, "connectivity.intermittent_drop": 1, "connectivity.slow_speed": 1}},
+        {"id": "unsure", "label": "I'm not sure", "likely": {}, "neutral": true}
+      ]
+    },
+    {
+      "id": "ont_light", "type": "single", "kind": "diagnostic",
+      "text": "Look at the fiber box (ONT) near your router. What does the LOS light show?",
+      "scope": ["fiber.loss_of_signal", "connectivity.area_outage", "connectivity.intermittent_drop"],
+      "options": [
+        {"id": "red", "label": "LOS is red or blinking", "likely": {"fiber.loss_of_signal": 1}, "facts": {"los_light": "red"}},
+        {"id": "off", "label": "LOS is off / normal", "likely": {"connectivity.area_outage": 1, "connectivity.intermittent_drop": 1}},
+        {"id": "none", "label": "I don't have a fiber box", "likely": {"connectivity.intermittent_drop": 1, "connectivity.area_outage": 1}},
+        {"id": "unsure", "label": "I can't check right now", "likely": {}, "neutral": true}
+      ]
+    },
+    {
+      "id": "wired_test", "type": "single", "kind": "diagnostic",
+      "text": "Does a device connected with a cable (or right next to the router) work fine?",
+      "scope": ["wifi.coverage_or_interference", "connectivity.intermittent_drop", "connectivity.slow_speed"],
+      "options": [
+        {"id": "fine", "label": "Yes, it works fine near the router / on cable", "likely": {"wifi.coverage_or_interference": 1}, "facts": {"wired_ok": true}},
+        {"id": "also_bad", "label": "No, it has the same problem", "likely": {"connectivity.intermittent_drop": 1, "connectivity.slow_speed": 1}, "facts": {"wired_ok": false}},
+        {"id": "untested", "label": "I haven't tried", "likely": {}, "neutral": true}
+      ]
+    },
+    {
+      "id": "timing", "type": "single", "kind": "diagnostic",
+      "text": "When does the problem happen?",
+      "scope": ["connectivity.intermittent_drop", "connectivity.slow_speed", "tv.picture_breakup"],
+      "options": [
+        {"id": "peak", "label": "Mostly in the evening / at busy times", "likely": {"connectivity.intermittent_drop": 1, "connectivity.slow_speed": 1}, "facts": {"time_pattern": "evening peak"}},
+        {"id": "always", "label": "All the time", "likely": {"connectivity.slow_speed": 1, "tv.picture_breakup": 1}},
+        {"id": "weather", "label": "In bad weather", "likely": {"tv.picture_breakup": 1}, "facts": {"weather_related": true}},
+        {"id": "random", "label": "Randomly, no pattern", "likely": {"connectivity.intermittent_drop": 1}}
+      ]
+    },
+    {
+      "id": "mobile_symptom", "type": "single", "kind": "diagnostic",
+      "text": "What isn't working on your phone?",
+      "scope": ["mobile.data_unavailable", "mobile.voice_calls_fail", "mobile.otp_sms_missing", "mobile.roaming_unavailable"],
+      "options": [
+        {"id": "data", "label": "Mobile data / internet", "likely": {"mobile.data_unavailable": 1}},
+        {"id": "calls", "label": "Making or receiving calls", "likely": {"mobile.voice_calls_fail": 1}},
+        {"id": "otp", "label": "OTP or bank SMS not arriving", "likely": {"mobile.otp_sms_missing": 1}},
+        {"id": "abroad", "label": "Nothing works - I'm abroad", "likely": {"mobile.roaming_unavailable": 1}, "facts": {"roaming": true}}
+      ]
+    },
+    {
+      "id": "signal", "type": "single", "kind": "diagnostic",
+      "text": "Does your phone show signal bars and your operator's name?",
+      "scope": ["mobile.data_unavailable", "mobile.voice_calls_fail", "mobile.otp_sms_missing", "sim.activation_pending", "mobile.roaming_unavailable", "porting.transfer_delayed"],
+      "options": [
+        {"id": "yes", "label": "Yes, signal looks normal", "likely": {"mobile.data_unavailable": 1, "mobile.voice_calls_fail": 1, "mobile.otp_sms_missing": 1}},
+        {"id": "no_service", "label": "No service / emergency calls only", "likely": {"sim.activation_pending": 1, "mobile.roaming_unavailable": 1, "porting.transfer_delayed": 1}, "facts": {"no_service": true}},
+        {"id": "unsure", "label": "Not sure", "likely": {}, "neutral": true}
+      ]
+    },
+    {
+      "id": "sim_situation", "type": "single", "kind": "diagnostic",
+      "text": "Which of these matches your SIM situation?",
+      "scope": ["sim.activation_pending", "sim.esim_download_failed", "porting.transfer_delayed"],
+      "options": [
+        {"id": "new_sim", "label": "New or replacement SIM isn't working", "likely": {"sim.activation_pending": 1}},
+        {"id": "esim", "label": "eSIM QR code / download fails", "likely": {"sim.esim_download_failed": 1}},
+        {"id": "port", "label": "I'm moving my number from another operator", "likely": {"porting.transfer_delayed": 1}}
+      ]
+    },
+    {
+      "id": "billing_issue", "type": "single", "kind": "diagnostic",
+      "text": "What's the problem with your bill or payment?",
+      "scope": ["billing.unexpected_charge", "billing.payment_not_reflected", "plan.renewal_failed"],
+      "options": [
+        {"id": "charge", "label": "There's a charge I don't recognise", "likely": {"billing.unexpected_charge": 1}},
+        {"id": "paid", "label": "I paid but it still shows due", "likely": {"billing.payment_not_reflected": 1}},
+        {"id": "recharge", "label": "Recharge done but plan not active", "likely": {"plan.renewal_failed": 1}}
+      ]
+    },
+    {
+      "id": "impact", "type": "single", "kind": "severity",
+      "text": "How much is this affecting you right now?",
+      "scope": [],
+      "options": [
+        {"id": "emergency", "label": "Safety / emergency calls are affected", "likely": {}, "facts": {"impact": "emergency"}},
+        {"id": "work", "label": "I can't work or run my business", "likely": {}, "facts": {"impact": "work"}},
+        {"id": "inconvenient", "label": "It's inconvenient but I can manage", "likely": {}, "facts": {"impact": "minor"}}
+      ]
+    },
+    {
+      "id": "tried", "type": "multi", "kind": "context",
+      "text": "What have you already tried? (select all that apply)",
+      "scope": [],
+      "options": [
+        {"id": "restart", "label": "Restarted the router / phone", "facts": {"tried": "restart"}},
+        {"id": "cables", "label": "Checked cables and power", "facts": {"tried": "cables"}},
+        {"id": "airplane", "label": "Toggled Airplane mode", "facts": {"tried": "airplane mode"}},
+        {"id": "reinsert", "label": "Re-inserted the SIM", "facts": {"tried": "sim reinsert"}},
+        {"id": "nothing", "label": "Nothing yet", "facts": {"tried": "nothing"}}
+      ]
+    },
+    {
+      "id": "details", "type": "text", "kind": "context",
+      "text": "Anything else we should know? An error message, device model or when it started helps us fix it faster.",
+      "scope": [],
+      "options": []
+    }
+  ]
+}

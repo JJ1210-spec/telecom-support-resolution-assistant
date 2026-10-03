@@ -1,0 +1,35 @@
+# Render Blueprint (free plan). Monolith mode keeps a single container within free instance hours;
+# the notification service is mounted at /notify and receives QStash pushes when PUBLIC_BASE_URL is set.
+services:
+  - type: web
+    name: resolve-desk
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: DEPLOY_MODE
+        value: monolith
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: APP_URL
+        sync: false
+      - fromGroup: resolve-desk-secrets
+envVarGroups:
+  - name: resolve-desk-secrets
+    envVars:
+      - { key: GEMINI_API_KEY, sync: false }
+      - { key: GROQ_API_KEY, sync: false }
+      - { key: JINA_API_KEY, sync: false }
+      - { key: QDRANT_URL, sync: false }
+      - { key: QDRANT_API_KEY, sync: false }
+      - { key: DATABASE_URL, sync: false }
+      - { key: UPSTASH_REDIS_REST_URL, sync: false }
+      - { key: UPSTASH_REDIS_REST_TOKEN, sync: false }
+      - { key: QSTASH_TOKEN, sync: false }
+      - { key: QSTASH_CURRENT_SIGNING_KEY, sync: false }
+      - { key: QSTASH_NEXT_SIGNING_KEY, sync: false }
+      - { key: LANGFUSE_PUBLIC_KEY, sync: false }
+      - { key: LANGFUSE_SECRET_KEY, sync: false }
+      - { key: OTEL_EXPORTER_OTLP_ENDPOINT, sync: false }
+      - { key: OTEL_EXPORTER_OTLP_HEADERS, sync: false }
+      - { key: SERVICE_TOKEN, generateValue: true }

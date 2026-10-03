@@ -1,0 +1,84 @@
+{
+  "_note": "Customer-safe self-help sections merged into the seed KB. Steps shown to customers may cite ONLY these sections (#h1, #h2 ...); agent-only checks (#c1 ...) never reach the customer view.",
+  "KB-BB-DROP": [
+    "Restart the router: switch it off at the wall, wait 30 seconds, and switch it back on. Wait 3 minutes for all lights to settle.",
+    "Note the exact times the connection drops and which devices are affected - this helps us find a pattern.",
+    "If you can, connect a laptop with an Ethernet cable and check whether it also disconnects at the same times.",
+    "Make sure the router is not on the floor, inside a cabinet, or next to a microwave or cordless phone base."
+  ],
+  "KB-BB-SLOW": [
+    "Run a speed test on a device connected with an Ethernet cable, with other downloads and streaming paused.",
+    "Repeat the test at different times of the day (morning, evening) and note the results.",
+    "Restart the router and test again; compare the result with the speed on your plan."
+  ],
+  "KB-BB-WIFI": [
+    "Check whether a device connected with a cable, or one held next to the router, works normally.",
+    "Move the router to a raised, central spot away from thick walls, mirrors and metal furniture.",
+    "If your router shows two networks (2.4 GHz and 5 GHz), use 2.4 GHz for far rooms and 5 GHz near the router."
+  ],
+  "KB-FIBER-LOS": [
+    "Check that the fiber box (ONT) is powered on and note which lights are on, and whether LOS is red, blinking or off.",
+    "Gently check that the thin fiber cable into the ONT is not bent sharply, pinched or unplugged. Do not look into the fiber end.",
+    "Restart the ONT and router once. If the LOS light stays red, the line needs a technician - do not keep restarting."
+  ],
+  "KB-BB-OUTAGE": [
+    "Check whether neighbours or other flats in your building are also without internet.",
+    "Check the service status page or app for a known outage in your area before restarting equipment.",
+    "Keep your router powered on so it reconnects automatically when the service is restored."
+  ],
+  "KB-MOB-DATA": [
+    "Turn Airplane mode on for 10 seconds, then off again.",
+    "Check that Mobile data is switched on and that your data pack is active and not exhausted.",
+    "Check APN settings: reset network settings or select the operator's default APN, then restart the phone."
+  ],
+  "KB-MOB-CALL": [
+    "Restart your phone and check that it shows your operator name and signal bars.",
+    "Check that call forwarding, call barring and Do Not Disturb are switched off.",
+    "Try the SIM in another phone, if available, to see whether the issue follows the SIM."
+  ],
+  "KB-MOB-OTP": [
+    "Ask a friend to send you a normal SMS to confirm that regular messages arrive.",
+    "Check that the sender is not blocked or filtered as spam in your messaging app, and that DND settings allow transactional messages.",
+    "Make sure your inbox is not full and restart the phone. Never share an OTP with anyone, including support."
+  ],
+  "KB-MOB-ROAM": [
+    "Check that International Roaming is enabled on your plan and in the phone settings (Data roaming ON).",
+    "Open network settings and choose a partner network manually instead of automatic selection.",
+    "Turn Airplane mode on and off, or restart the phone, after arriving in the new country."
+  ],
+  "KB-SIM-ACT": [
+    "Restart the phone and wait up to 30 minutes after the activation message for the network to register the SIM.",
+    "Remove and re-insert the SIM firmly, and check it in another phone if possible.",
+    "If it still shows no service, support will verify your identity through the secure process - never share your full ID number in chat."
+  ],
+  "KB-ESIM-QR": [
+    "Check that your phone supports eSIM and is connected to Wi-Fi during the download.",
+    "Check whether an eSIM profile already appears in Settings > Mobile/Cellular before scanning again.",
+    "Do not share the QR code or activation code with anyone; if it says already used, support must reissue it securely."
+  ],
+  "KB-BILL-EXTRA": [
+    "Open your latest bill and note the exact line item, amount and billing period you do not recognise.",
+    "Check whether any add-on, value-added service or roaming usage was active during that period.",
+    "Share only the line item and amount with support - never share full card or bank details."
+  ],
+  "KB-BILL-PAY": [
+    "Keep the payment reference / transaction ID and the date and amount of the payment ready.",
+    "Allow up to 2 hours for online payments to reflect, then refresh the app or portal.",
+    "Do not pay again for the same bill while the first payment is being traced."
+  ],
+  "KB-PLAN-RENEW": [
+    "Check the recharge status and transaction ID in your payment app or bank statement.",
+    "Restart your phone so it receives the updated plan, then check balance and validity in the app.",
+    "Note whether the money was debited; support will match it with your plan activation."
+  ],
+  "KB-PORT-DELAY": [
+    "Check the porting SMS for your port request status and the scheduled date and time.",
+    "Keep both the old and new SIMs with you; restart the phone with the new SIM after the scheduled window.",
+    "If neither SIM works after the window, tell support right away - this is treated as urgent."
+  ],
+  "KB-TV-PIXEL": [
+    "Note which channels are affected and whether it happens at particular times or in bad weather.",
+    "Check that the cable between the set-top box and the wall/dish is firmly connected (do not climb to reach a dish).",
+    "Restart the set-top box by switching it off at the wall for 30 seconds."
+  ]
+}

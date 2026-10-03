@@ -109,3 +109,49 @@ This log records issues found during the project. Keep the original symptom, att
 - **Observed:** The first live portal request took 110.5 seconds, mainly because drafting took 82.2 seconds. A later run took 55.8 seconds after limiting sources and output length; this is still slow for an interactive customer flow.
 - **Resolution so far:** Ticket creation is persisted before AI analysis; a failure leaves it in `needs_review`, visible to admins with a retry action. The admin dashboard checks whether Ollama and the Knowledge service are reachable. The prompt uses at most four steps and fewer source passages.
 - **Remaining:** Measure latency across many cases; move AI analysis into a durable worker queue, add safe retry/backoff and resource monitoring, and consider a faster local model or capable hardware. Availability cannot be guaranteed if Ollama or the laptop is down.
+
+## P6-001 "Not sure" answers penalised in-scope intents — resolved
+
+- **Phase:** 6, adaptive intake.
+- **Observed:** A unit test showed that answering "I'm not sure" to *"Are neighbours also affected?"* lowered the probability of every in-scope intent (slow speed 0.20 → 0.13) and raised out-of-scope ones.
+- **Cause:** Neutral options had probability 0.10/Σ for in-scope intents but 1/3 for out-of-scope intents, so a non-answer still counted as evidence.
+- **Resolution:** A neutral option now carries a fixed share of probability (0.15) under *every* intent, and the remaining 0.85 is split among the informative options. A non-answer therefore leaves the posterior unchanged.
+- **Verification:** `test_likelihoods_are_distributions_and_update_concentrates_posterior` asserts the posterior is unchanged to 1e-9.
+
+## P6-002 Retrieval took 1.6-3.4 s on the hosted stack — resolved
+
+- **Phase:** 6, hosted APIs.
+- **Observed:** Live traces showed retrieval at 1.6-3.4 s even when the query embedding was cached.
+- **Cause:** Each Qdrant call costs about 350 ms (the cluster is in sa-east-1), and the ticket/KB searches and their two rerank calls ran one after another. Query-embedding cache lookups also went to Neon (about 150 ms).
+- **Resolution:** Ticket and KB searches now run concurrently, and so do the two rerank calls. Query embeddings use an in-process LRU; the database hash cache is kept for passages, where it matters for re-indexing cost.
+- **Verification:** Measured warm retrieval at 0.75 s (search 0.35 s + rerank 0.39 s).
+
+## P6-003 Gemini drafts failed validation or stopped with RECITATION — resolved
+
+- **Phase:** 6, hosted APIs.
+- **Observed:** About half of the draft calls to `gemini-3.5-flash-lite` fell back to Groq, adding 5-15 s. The failures were (a) `agent_steps` returned as plain strings, (b) truncated JSON, and (c) `finishReason: RECITATION` when steps copied KB text.
+- **Methods tried:** Passed the Pydantic schema through as `responseJsonSchema` (constrained decoding) and added a "rephrase, don't copy" instruction (`draft@3.1`). That fixed (a), but (b) and (c) still occurred.
+- **Resolution:** Kept constrained decoding for Gemini. Content-filter stops now raise a provider error, so the gateway fails over at once instead of retrying the same model. By measurement, the draft chain is now `groq:openai/gpt-oss-120b` first with Gemini as fallback, and triage stays Gemini-first. This is a configuration change only.
+- **Verification:** Four consecutive live analyses ran triage and draft on the primary provider: triage 1.3-1.5 s, draft 1.5-2.8 s.
+
+## P6-004 Steps cited a neighbouring KB article — resolved
+
+- **Phase:** 6, grounding.
+- **Observed:** A complaint triaged as *weak Wi-Fi in some rooms* received steps from the *intermittent drop* article, because the Wi-Fi article's sections ranked below the drop article for that wording.
+- **Resolution:** Parent-document expansion now always loads the published article(s) for the *triaged intent* first, followed by the best retrieved articles (at most 2).
+- **Verification:** Re-running the same complaint on the hosted stack gave customer steps citing `KB-BB-WIFI#h1-h3` and agent steps citing `KB-BB-WIFI#c1-c3`. The agent steps also cited `LRN-TCK-2610-39B122`, the case learned from the earlier live ticket, which shows the learning loop end to end.
+
+## P6-005 Rate-limit storm degraded 70% of the first live eval — resolved
+
+- **Phase:** 6, evaluation.
+- **Observed:** `reports/eval_20261003_181606.md` (3 concurrent cases) showed `triage_llm_unavailable` 28× and `draft_llm_unavailable` 38×. P1 recall fell to 50% and 54/56 cases routed to humans. When the LLM was reachable, quality was high: intent macro-F1 0.936, 100% citation validity, 100% judged step support, 0 unsafe routes.
+- **Cause:** A burst probe confirmed the free-tier limits: Gemini Flash-Lite allows 15 requests/min, and Groq gpt-oss-120b allows 8,000 tokens/min (about two drafts a minute). The gateway treated 429s as failures, so the circuit breakers opened on both providers, and the chains held only two models.
+- **Resolution:**
+  - per-model sliding-window RPM/TPM limiter (wait at most 6 s, otherwise fail over);
+  - 429 → cooldown from Retry-After / retryDelay without tripping the breaker;
+  - four-model chains with independent quotas (`gemini-3.1-flash-lite` and `gpt-oss-20b` added);
+  - smaller draft prompts (the triaged article in full, other articles only their self-help sections; 3 past cases);
+  - degraded triage borrows the severity of the nearest resolved cases;
+  - multilingual P1 rules: Hindi/Hinglish "padosi offline", "poori gali", "LOS laal", "एल ओ एस लाल" were missed before, and bare "kaam" was removed from the work-impact cue because "kaam nahi kar raha" means "not working";
+  - evals run sequentially by default and also report metrics on the LLM-available subset.
+- **Verification:** new tests cover the limiter window maths, the 429 cooldown (breaker stays closed) and the multilingual P1 phrases. The sequential re-run `reports/eval_20261003_183348.md` had a 1.8% degraded rate (was 69.6%), P1 recall 100% (was 50%), intent macro-F1 1.000 and 0 unsafe routes.
