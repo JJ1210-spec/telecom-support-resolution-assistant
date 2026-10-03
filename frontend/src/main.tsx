@@ -1,0 +1,69 @@
+import { StrictMode, type ReactNode } from "react";
+import { createRoot } from "react-dom/client";
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import "./styles/app.css";
+import { ConsoleLayout, SiteLayout } from "./components/Layout";
+import { Spinner } from "./components/ui";
+import { AuthProvider, homeFor, useAuth } from "./hooks/useAuth";
+import type { Role } from "./api/types";
+import Landing from "./pages/Landing";
+import { Login, Register } from "./pages/Auth";
+import NewTicket from "./pages/customer/NewTicket";
+import { MyTickets, TicketDetail } from "./pages/customer/Tickets";
+import AgentTicket from "./pages/agent/AgentTicket";
+import { IncidentsPage, OverviewPage, PlaygroundPage, QueuePage } from "./pages/agent/Console";
+import { DriftPage, HealthPage, KnowledgePage, TaxonomyPage } from "./pages/admin/Admin";
+
+function Guard({ roles, children }: { roles: Role[]; children: ReactNode }) {
+  const { user, loading } = useAuth();
+  const location = useLocation();
+  if (loading) return <div className="container page"><Spinner /></div>;
+  if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  if (!roles.includes(user.role)) return <Navigate to={homeFor(user)} replace />;
+  return <>{children}</>;
+}
+
+function GuestOnly({ children }: { children: ReactNode }) {
+  const { user, loading } = useAuth();
+  if (loading) return null;
+  return user ? <Navigate to={homeFor(user)} replace /> : <>{children}</>;
+}
+
+const STAFF: Role[] = ["agent", "admin"];
+
+function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<Landing />} />
+      <Route element={<SiteLayout />}>
+        <Route path="/login" element={<GuestOnly><Login /></GuestOnly>} />
+        <Route path="/register" element={<GuestOnly><Register /></GuestOnly>} />
+        <Route path="/tickets" element={<Guard roles={["customer"]}><MyTickets /></Guard>} />
+        <Route path="/tickets/new" element={<Guard roles={["customer"]}><NewTicket /></Guard>} />
+        <Route path="/tickets/:id" element={<Guard roles={["customer"]}><TicketDetail /></Guard>} />
+      </Route>
+      <Route path="/console" element={<Guard roles={STAFF}><ConsoleLayout /></Guard>}>
+        <Route index element={<OverviewPage />} />
+        <Route path="queue" element={<QueuePage />} />
+        <Route path="tickets/:id" element={<AgentTicket />} />
+        <Route path="incidents" element={<IncidentsPage />} />
+        <Route path="playground" element={<PlaygroundPage />} />
+        <Route path="knowledge" element={<KnowledgePage />} />
+        <Route path="taxonomy" element={<TaxonomyPage />} />
+        <Route path="drift" element={<DriftPage />} />
+        <Route path="health" element={<HealthPage />} />
+      </Route>
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
+
+createRoot(document.getElementById("root")!).render(
+  <StrictMode>
+    <BrowserRouter>
+      <AuthProvider>
+        <App />
+      </AuthProvider>
+    </BrowserRouter>
+  </StrictMode>,
+);
