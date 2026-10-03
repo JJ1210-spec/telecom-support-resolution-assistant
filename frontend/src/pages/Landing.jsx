@@ -116,10 +116,7 @@ export default function Landing() {
       <section className="hero hero-glow">
         <div className="container hero-grid">
           <div>
-            <span className="badge" style={{ background: "#16181c", color: "#a8acb3" }}>
-              <span className="dot" style={{ color: "var(--up)" }} /> Support for broadband, mobile, SIM, bills & TV
-            </span>
-            <h1 className="display-mega" style={{ marginTop: 24 }}>
+            <h1 className="display-mega">
               Support that solves it the first time.
             </h1>
             <p className="lead">
@@ -140,24 +137,20 @@ export default function Landing() {
               Email confirmation in seconds · Your ticket stays open until you say it's fixed
             </p>
           </div>
-          <div className="mock-stack" aria-hidden="true">
-            <div className="mock float" style={{ top: 0, left: "6%", right: 0 }}>
+          <div className="hero-cards" aria-hidden="true">
+            <div className="hero-card hero-card-wide">
               <div className="row-between">
-                <span className="caption" style={{ color: "#a8acb3" }}>
-                  TCK-2610-8F2A1C
-                </span>
+                <span className="mono hc-muted">TCK-2610-8F2A1C</span>
                 <span className="badge badge-green">Solved 41× before</span>
               </div>
-              <div className="title-md" style={{ marginTop: 12 }}>
-                Internet keeps disconnecting
-              </div>
-              <div style={{ marginTop: 12 }}>
+              <div className="title-md hc-title">Internet keeps disconnecting</div>
+              <ul className="hc-steps">
                 {[
                   ["on", "Restart the router and wait 3 minutes"],
                   ["off", "Note when it drops and on which devices"],
                   ["", "Test with an Ethernet cable"],
                 ].map(([state, text]) => (
-                  <div className="mrow" key={text}>
+                  <li key={text}>
                     <span className={`check ${state}`}>
                       {state === "on" ? (
                         <Icon name="check" size={14} stroke={2.5} />
@@ -165,40 +158,28 @@ export default function Landing() {
                         <Icon name="x" size={12} stroke={2.5} />
                       ) : null}
                     </span>
-                    <span style={{ flex: 1 }}>{text}</span>
+                    <span className="grow">{text}</span>
                     <Icon name="chat" size={16} />
-                  </div>
+                  </li>
                 ))}
-              </div>
+              </ul>
             </div>
-            <div className="mock secondary float delay" style={{ top: 255, left: 0, width: "60%" }}>
-              <div className="caption" style={{ color: "#a8acb3" }}>
-                Which of these is closest?
-              </div>
-              <div className="chips" style={{ marginTop: 12 }}>
+            <div className="hero-card">
+              <div className="hc-muted">Which of these is closest?</div>
+              <div className="hc-options">
                 {["Drops at night", "Slow speed", "Weak in one room"].map((c, i) => (
-                  <span
-                    key={c}
-                    className="chip"
-                    style={{ background: i === 0 ? "#0052ff" : "#0a0b0d", color: "#fff", borderColor: "#2a2d33" }}
-                  >
+                  <span key={c} className={`hc-option${i === 0 ? " active" : ""}`}>
                     {c}
                   </span>
                 ))}
               </div>
             </div>
-            <div className="mock secondary float" style={{ top: 300, right: 0, width: "36%" }}>
-              <div className="caption" style={{ color: "#a8acb3" }}>
-                Specialist reply
-              </div>
-              <div className="body-sm" style={{ marginTop: 8 }}>
-                “Does it drop on 5 GHz only?”
-              </div>
-              <div className="row" style={{ marginTop: 10, gap: 6 }}>
-                <span className="badge badge-blue">Only 5 GHz</span>
-                <span className="badge" style={{ background: "#2a2d33", color: "#fff" }}>
-                  Both
-                </span>
+            <div className="hero-card">
+              <div className="hc-muted">Specialist reply</div>
+              <div className="hc-quote">“Does it drop on 5 GHz only?”</div>
+              <div className="hc-options">
+                <span className="hc-option active">Only 5 GHz</span>
+                <span className="hc-option">Both</span>
               </div>
             </div>
           </div>

@@ -236,15 +236,10 @@ table.table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .hero { background: var(--surface-dark); color: #fff; overflow: hidden; }
 .hero-grid { display: grid; grid-template-columns: 1.05fr 1fr; gap: 48px; align-items: center; padding-block: 96px 112px; }
 .hero p.lead { color: var(--on-dark-soft); font-size: 18px; max-width: 520px; margin: 24px 0 32px; }
-.mock-stack { position: relative; height: 460px; }
-.mock { position: absolute; background: var(--surface-dark-elevated); border: 1px solid var(--surface-dark-line); border-radius: var(--r-xl); padding: 24px; color: #fff; box-shadow: 0 30px 60px rgba(0,0,0,.35); }
-.mock .mrow { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--surface-dark-line); font-size: 14px; }
-.mock .mrow:last-child { border-bottom: 0; }
 .check { width: 20px; height: 20px; border-radius: 6px; border: 1.5px solid #4a4f58; display: grid; place-items: center; flex: none; }
 .check.on { background: var(--up); border-color: var(--up); }
 .check.off { background: var(--down); border-color: var(--down); }
-@media (max-width: 1024px) { .hero-grid { grid-template-columns: 1fr; padding-block: 64px; } .mock-stack { height: 380px; } }
-@media (max-width: 640px) { .mock-stack { height: auto; } .mock { position: relative !important; inset: auto !important; transform: none !important; margin-bottom: 12px; } .mock.secondary { display: none; } }
+@media (max-width: 1024px) { .hero-grid { grid-template-columns: 1fr; padding-block: 64px; } }
 
 /* ---------- ticket detail ---------- */
 .status-hero { border-radius: var(--r-xl); padding: 28px 32px; background: var(--surface-dark); color: #fff; }
