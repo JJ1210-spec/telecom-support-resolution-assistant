@@ -86,3 +86,26 @@ This log records issues found during the project. Keep the original symptom, att
 - **Methods tried:** Measured top-source scores across 48 answerable and 8 abstain development complaints. At a 0.60 score gate, 39 answerable cases would pass and 7 abstain cases would be rejected. These data informed the gate and cannot serve as independent validation.
 - **Resolution:** Added a provisional `MIN_DRAFT_SCORE=0.60` check before drafting and withheld steps when a summary explicitly reports insufficient evidence. Added focused tests.
 - **Verification:** The same vague complaint returned `insufficient_evidence`, zero steps and top score 0.57538 in 19.7 seconds; a clear fiber outage still returned four cited steps. Broader independent abstention and citation-support evaluation remains open.
+
+## DEV-008 Portal and Assist circular import — resolved
+
+- **Phase:** 5, authenticated portals.
+- **Observed:** The new admin account CLI failed when the portal module was imported directly, although API tests passed.
+- **Cause:** Portal imported the request schema from Assist, while Assist imported Portal during app setup.
+- **Resolution:** Moved the shared `ResolveInput` schema into `schemas.py` and imported it from both services.
+- **Verification:** Direct portal module import, `python -m telecom_assistant.portal --help`, the full test suite and lint passed.
+
+## DEV-009 Local Wi-Fi case received over-severe and weakly supported customer advice — resolved for this example
+
+- **Phase:** 5, real-model portal integration.
+- **Observed:** A localized weak-Wi-Fi complaint was classified P2, so no customer check appeared. Its draft also invented a duration. A later P3 result produced a customer step justified only by the KB article title.
+- **Methods tried:** Inspected saved model output, source scores, stage timings, and the exact KB lines rather than relying on a valid source ID alone.
+- **Resolution:** Added a narrow localized-Wi-Fi P3 rule, a conservative three-case intent agreement adjustment, a shorter KB-first draft prompt, summary overconfidence replacement, and a customer gate that matches actionable KB check lines only. The customer sees the KB wording and its supporting excerpt.
+- **Verification:** The second live run returned P3 in 55.8 seconds. Reapplying the final gate to the saved real draft yielded two actionable KB checks and rejected the title-only match. Targeted tests and the 17-test suite passed. Broader independent quality validation remains open.
+
+## DEV-010 Real-model latency and availability — mitigated, open
+
+- **Phase:** 5, portal integration.
+- **Observed:** The first live portal request took 110.5 seconds, mainly because drafting took 82.2 seconds. A later run took 55.8 seconds after limiting sources and output length; this is still slow for an interactive customer flow.
+- **Resolution so far:** Ticket creation is persisted before AI analysis; a failure leaves it in `needs_review`, visible to admins with a retry action. The admin dashboard checks whether Ollama and the Knowledge service are reachable. The prompt uses at most four steps and fewer source passages.
+- **Remaining:** Measure latency across many cases; move AI analysis into a durable worker queue, add safe retry/backoff and resource monitoring, and consider a faster local model or capable hardware. Availability cannot be guaranteed if Ollama or the laptop is down.
