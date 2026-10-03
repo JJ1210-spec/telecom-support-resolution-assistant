@@ -1,9 +1,7 @@
-"""Observability: structured logs, an in-process metrics registry, Langfuse LLM traces and OTel export.
+"""Observability: structured JSON logs, an in-process metrics registry and Langfuse LLM traces.
 
-* `metrics` keeps counters and latency histograms in memory; `/metrics` exposes them in Prometheus
-  text format and the admin Health page reads them as JSON.
-* When OTEL_EXPORTER_OTLP_ENDPOINT is set and the `otel` extra is installed, the same instruments are
-  mirrored to Grafana Cloud over OTLP/HTTP.
+* `metrics` keeps counters and latency histograms in memory; `/metrics` exposes them in Prometheus text
+  format (scrapeable by Prometheus / Grafana Agent) and the admin Health page reads them as JSON.
 * LLM generations are batched to the Langfuse ingestion API in the background (never on the hot path).
 """
 
@@ -71,21 +69,11 @@ class Metrics:
         self.counters: dict[tuple[str, tuple], float] = defaultdict(float)
         self.samples: dict[tuple[str, tuple], deque[float]] = defaultdict(lambda: deque(maxlen=2000))
         self.hist: dict[tuple[str, tuple], list[int]] = defaultdict(lambda: [0] * (len(_BUCKETS) + 1))
-        self._otel_counters: dict[str, Any] = {}
-        self._otel_hists: dict[str, Any] = {}
-        self._meter = None
-
-    def attach_otel(self, meter: Any) -> None:
-        self._meter = meter
 
     def inc(self, name: str, value: float = 1.0, **labels: str) -> None:
         key = (name, tuple(sorted(labels.items())))
         with self._lock:
             self.counters[key] += value
-        if self._meter is not None:
-            counter = self._otel_counters.get(name) or self._otel_counters.setdefault(
-                name, self._meter.create_counter(name))
-            counter.add(value, labels)
 
     def observe(self, name: str, value_ms: float, **labels: str) -> None:
         key = (name, tuple(sorted(labels.items())))
@@ -98,10 +86,6 @@ class Metrics:
                     break
             else:
                 buckets[-1] += 1
-        if self._meter is not None:
-            hist = self._otel_hists.get(name) or self._otel_hists.setdefault(
-                name, self._meter.create_histogram(name, unit="ms"))
-            hist.record(value_ms, labels)
 
     @staticmethod
     def _pct(values: list[float], q: float) -> float:
@@ -208,31 +192,3 @@ class Langfuse:
             await asyncio.sleep(interval)
             with contextlib.suppress(Exception):
                 await self.flush()
-
-
-def setup_otel(settings: Settings) -> bool:
-    """Mirror metrics to an OTLP endpoint (Grafana Cloud). Optional: requires the `otel` extra."""
-    if not settings.otel_endpoint:
-        return False
-    try:
-        from opentelemetry import metrics as otel_metrics
-        from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
-        from opentelemetry.sdk.metrics import MeterProvider
-        from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
-        from opentelemetry.sdk.resources import Resource
-    except ImportError:
-        log_event("otel_unavailable", reason="install the 'otel' extra to export metrics")
-        return False
-    headers = {}
-    for part in settings.otel_headers.split(","):
-        if "=" in part:
-            key, value = part.split("=", 1)
-            headers[key.strip()] = value.strip().replace("%20", " ")
-    exporter = OTLPMetricExporter(endpoint=f"{settings.otel_endpoint.rstrip('/')}/v1/metrics", headers=headers)
-    reader = PeriodicExportingMetricReader(exporter, export_interval_millis=30000)
-    provider = MeterProvider(resource=Resource.create({"service.name": "telecom-support-assistant"}),
-                             metric_readers=[reader])
-    otel_metrics.set_meter_provider(provider)
-    metrics.attach_otel(otel_metrics.get_meter("telecom"))
-    log_event("otel_enabled", endpoint=settings.otel_endpoint)
-    return True

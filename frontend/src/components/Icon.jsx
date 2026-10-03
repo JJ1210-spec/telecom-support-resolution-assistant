@@ -1,5 +1,5 @@
 // Minimal geometric icon set (1.75px strokes, 24px grid) — matches the design system's restraint.
-const PATHS: Record<string, string> = {
+const PATHS = {
   wifi: "M2 9a15 15 0 0 1 20 0M5.5 12.5a10 10 0 0 1 13 0M9 16a5 5 0 0 1 6 0M12 19.5h.01",
   phone: "M7 2h10a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zM11 18h2",
   sim: "M7 2h7l5 5v14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zM9 12h6v6H9z",
@@ -28,8 +28,7 @@ const PATHS: Record<string, string> = {
   shield: "M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z",
   bolt: "M13 2L4 14h7l-1 8 9-12h-7z",
 };
-
-export function Icon({ name, size = 20, stroke = 1.75, className }: { name: string; size?: number; stroke?: number; className?: string }) {
+export function Icon({ name, size = 20, stroke = 1.75, className }) {
   return (
     <svg
       width={size}
@@ -47,8 +46,7 @@ export function Icon({ name, size = 20, stroke = 1.75, className }: { name: stri
     </svg>
   );
 }
-
-export function BrandMark({ size = 28 }: { size?: number }) {
+export function BrandMark({ size = 28 }) {
   return (
     <span className="brand-mark" style={{ width: size, height: size }}>
       <Icon name="check" size={size * 0.6} stroke={2.6} className="" />

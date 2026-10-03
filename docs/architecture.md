@@ -11,7 +11,7 @@ alternatives that were considered.
 
 ```mermaid
 flowchart LR
-  subgraph Client["React SPA (Vite + TS)"]
+  subgraph Client["React SPA (Vite + JSX)"]
     C["Customer portal<br/>intake wizard · step checklist ·<br/>per-step chat · confirm/reopen"]
     A["Agent / admin console<br/>queue · copilot · incidents ·<br/>KB review · taxonomy · drift · health"]
   end
@@ -45,7 +45,6 @@ flowchart LR
     RD[("Upstash Redis<br/>cache · quotas · rate limits")]
     QS["Upstash QStash<br/>signed push, retries"]
     LF["Langfuse<br/>LLM traces"]
-    GF["Grafana Cloud<br/>OTLP metrics"]
   end
 
   C & A --> API --> DESK
@@ -59,7 +58,6 @@ flowchart LR
   OUT -- "PUBLIC_BASE_URL set" --> QS --> NS
   OUT -- "NOTIFY_URL / in-process" --> NS
   LLMG -.-> LF
-  API -.-> GF
 ```
 
 **Boundaries.** Online work runs on request: intake, analysis, conversation. Side effects run asynchronously:
@@ -154,8 +152,9 @@ Special cases:
 - **Unclear complaint** (flat posterior and no chip chosen): the first question is "Which of these is closest?",
   built from the current top candidates plus "Something else". Choosing "Something else" routes the ticket to a
   human and adds it to the discovery pool.
-- **No bank question discriminates the remaining candidates** (for example, a newly approved class): the LLM
-  writes one multiple-choice question whose options map to candidate intents.
+- **No bank question discriminates the remaining candidates** (for example, a newly approved class): the
+  engine asks one open "anything else?" question and re-runs the k-NN vote with the extra text. Intake makes
+  no LLM calls at all, so it is fast, free and fully deterministic.
 
 The engine stops at posterior ≥ 0.8, when the budget is spent, or when no question gains at least 0.08 bits.
 Context questions (impact, "what have you tried") feed severity and stop the AI from repeating steps the

@@ -6,11 +6,13 @@ with an AI copilot, keeps every ticket **open until the customer confirms the fi
 confirmed resolution to the knowledge base.
 
 - Backend: Python, FastAPI.
-- Frontend: React with TypeScript, styled to the Coinbase-derived design system in `DESIGN-coinbase.md`.
+- Frontend: React (JavaScript/JSX) with Vite, styled to the Coinbase-derived design system in `DESIGN-coinbase.md`.
 - Hosted services, all on free tiers: Gemini, Groq, Jina, Qdrant Cloud, Neon Postgres, Upstash Redis + QStash,
-  Langfuse and Grafana.
+  Langfuse.
 - The same code also runs fully offline.
 
+> **Preparing to explain it? Start with [docs/INTERVIEW_GUIDE.md](docs/INTERVIEW_GUIDE.md).**
+>
 > Architecture, algorithms, scaling and design decisions: **[docs/architecture.md](docs/architecture.md)** ·
 > Product requirements: `../docs/PRD.md` · Problem log: [docs/issues-and-errors.md](docs/issues-and-errors.md)
 
@@ -33,7 +35,7 @@ confirmed resolution to the knowledge base.
 ```bash
 # 1. Python backend
 python -m venv .venv
-.venv/Scripts/python -m pip install -e ".[dev,otel]"      # macOS/Linux: .venv/bin/python
+.venv/Scripts/python -m pip install -e ".[dev]"      # macOS/Linux: .venv/bin/python
 cp .env.example .env                                       # add API keys (all optional; see below)
 
 # 2. Check providers, load the corpus, create demo users + tickets
@@ -65,8 +67,8 @@ or Groq). Without one, tickets still save and go to a human.
 | Resolved → summary into knowledge base | `tickets/desk.py::learn`, `ai/assistants.py::Summarizer`, `knowledge/indexer.py` |
 | AI suggestions for escalated tickets | `ai/assistants.py::Copilot`, `tickets/desk.py::refresh_copilot` |
 | Questions (MCQ / free text) to narrow the problem | `ai/clarify.py`, `resources/questions.json` |
-| Step checkboxes + per-step side chat | `tickets/desk.py::step_feedback/step_chat`, `frontend/src/pages/customer/Tickets.tsx` |
-| Customer ↔ agent messages, choices for unclear complaints | `desk.py::agent_message/customer_message`, `NewTicket.tsx`, `Chat.tsx` |
+| Step checkboxes + per-step side chat | `tickets/desk.py::step_feedback/step_chat`, `frontend/src/pages/customer/Tickets.jsx` |
+| Customer ↔ agent messages, choices for unclear complaints | `desk.py::agent_message/customer_message`, `NewTicket.jsx`, `Chat.jsx` |
 | Data drift | `insights/drift.py`, `insights/discovery.py`, `knowledge/taxonomy.py`, `cli.py reindex` |
 
 ## Evaluation and system health
@@ -104,7 +106,7 @@ then fails over to slower backup models. The first eval run, with no pacing, is 
 
 At runtime:
 
-- `/metrics` exposes Prometheus metrics (also mirrored to Grafana over OTLP when configured);
+- `/metrics` exposes Prometheus metrics (scrapeable by Prometheus or Grafana Agent);
 - `/ready` checks the database, vector store and cache;
 - LLM generations are traced to Langfuse;
 - the admin **Health** page shows provider quota meters, circuit breakers, latency, the outbox/DLQ and the email
@@ -115,7 +117,7 @@ At runtime:
 ```bash
 .venv/Scripts/python -m pytest -q          # 27 tests, no network: fake LLM, hash embedder, local index, SQLite
 .venv/Scripts/python -m ruff check src tests
-cd frontend && npx tsc -b --noEmit && npm run build
+cd frontend && npm run build
 ```
 
 CI (`.github/workflows/ci.yml`) runs lint, tests, dataset validation, the frontend build and a Docker build.
@@ -134,7 +136,7 @@ src/telecom_assistant/
   insights/       drift, discovery, incident radar, KPIs
   resources/      taxonomy seed, question bank, customer self-help KB sections
   evaluation.py   eval harness + markdown report
-frontend/         React + Vite + TypeScript (customer portal and agent/admin console)
+frontend/         React + Vite, JavaScript/JSX (customer portal and agent/admin console)
 data/synthetic/v1 synthetic corpus, held-out eval cases, update events
 docs/             architecture, phase records, issues log
 ```

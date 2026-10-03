@@ -39,7 +39,7 @@ class FakeLLM:
         kind = ("triage" if "triage classifier" in system else "draft" if "grounded resolution" in system
                 else "copilot" if "senior telecom" in system else "summary" if "knowledge-base record" in system
                 else "stepchat" if "ONE troubleshooting step" in system else "judge" if "verify whether" in system
-                else "clarify" if "clarifying question" in system else "name" if "NEW telecom" in system else "other")
+                else "name" if "NEW telecom" in system else "other")
         self.calls.append(kind)
         if kind == "triage":
             complaint = user.split("<complaint>")[-1].casefold()
@@ -85,10 +85,6 @@ class FakeLLM:
         if kind == "judge":
             n = len(json.loads(user))
             return json.dumps({"verdicts": [{"n": i, "supported": True, "reason": "ok"} for i in range(n)]}), {}
-        if kind == "clarify":
-            candidates = json.loads(user)["candidates"]
-            return json.dumps({"text": "Which fits best?", "options": [
-                {"label": c["label"], "intent": c["intent"]} for c in candidates]}), {}
         if kind == "name":
             return json.dumps({"intent": "network.new_issue", "label": "New issue", "description": "Emerging cluster",
                                "product": "Home Broadband", "category": "Technical Support", "area": "internet"}), {}

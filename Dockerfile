@@ -12,7 +12,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
 WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY src ./src
-RUN pip install ".[otel]"
+RUN pip install .
 COPY data ./data
 COPY --from=web /web/dist ./frontend/dist
 RUN useradd --create-home appuser && mkdir -p /app/.runtime && chown -R appuser /app

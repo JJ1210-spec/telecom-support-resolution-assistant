@@ -1,12 +1,11 @@
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import { useAuth } from "../hooks/useAuth";
 import { useLiveEvents, useResource } from "../hooks/useLive";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { BrandMark, Icon } from "./Icon";
-
-function initials(name?: string, email?: string) {
+function initials(name, email) {
   const source = (name || email || "?").trim();
   return source
     .split(/\s+/)
@@ -15,8 +14,7 @@ function initials(name?: string, email?: string) {
     .slice(0, 2)
     .toUpperCase();
 }
-
-export function TopNav({ dark = false }: { dark?: boolean }) {
+export function TopNav({ dark = false }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -30,7 +28,12 @@ export function TopNav({ dark = false }: { dark?: boolean }) {
         <nav className="navlinks hide-mobile" aria-label="Main">
           {user?.role === "customer" && (
             <>
-              <NavLink to="/tickets" className={({ isActive }) => `navlink${isActive && !location.pathname.endsWith("/new") ? " active" : ""}`}>
+              <NavLink
+                to="/tickets"
+                className={({ isActive }) =>
+                  `navlink${isActive && !location.pathname.endsWith("/new") ? " active" : ""}`
+                }
+              >
                 My tickets
               </NavLink>
               <NavLink to="/tickets/new" className={({ isActive }) => `navlink${isActive ? " active" : ""}`}>
@@ -75,7 +78,6 @@ export function TopNav({ dark = false }: { dark?: boolean }) {
     </header>
   );
 }
-
 /** Normal scrolling page (sign in / register). */
 export function SiteLayout() {
   const location = useLocation();
@@ -90,7 +92,6 @@ export function SiteLayout() {
     </>
   );
 }
-
 /** Full-height app shell for the customer portal: fixed header, panels scroll on their own. */
 export function AppLayout() {
   const location = useLocation();
@@ -105,8 +106,7 @@ export function AppLayout() {
     </div>
   );
 }
-
-const CONSOLE_LINKS: { to: string; label: string; icon: string; admin?: boolean; section?: string }[] = [
+const CONSOLE_LINKS = [
   { to: "/console", label: "Overview", icon: "grid", section: "Support" },
   { to: "/console/queue", label: "Queue", icon: "inbox" },
   { to: "/console/incidents", label: "Incident radar", icon: "radar" },
@@ -116,14 +116,13 @@ const CONSOLE_LINKS: { to: string; label: string; icon: string; admin?: boolean;
   { to: "/console/drift", label: "Data drift", icon: "pulse", section: "Reliability" },
   { to: "/console/health", label: "System health", icon: "shield" },
 ];
-
 export function ConsoleLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const flush = location.pathname.startsWith("/console/tickets/");
   const [tick, setTick] = useState(0);
-  const counts = useResource(() => api.get<{ counts: { human_queue: number } }>("/v1/agent/queue?scope=human"), [tick]);
+  const counts = useResource(() => api.get("/v1/agent/queue?scope=human"), [tick]);
   useLiveEvents((event) => {
     if (["created", "analyzed", "escalated", "status", "reopened"].includes(event.kind)) setTick((t) => t + 1);
   });
@@ -135,7 +134,11 @@ export function ConsoleLayout() {
           Resolve Desk
         </Link>
         {CONSOLE_LINKS.map((link) => (
-          <SideLink key={link.to} {...link} count={link.to === "/console/queue" ? counts.data?.counts.human_queue : undefined} />
+          <SideLink
+            key={link.to}
+            {...link}
+            count={link.to === "/console/queue" ? counts.data?.counts.human_queue : undefined}
+          />
         ))}
         <div style={{ marginTop: "auto" }} />
         <div className="side-link" style={{ cursor: "default" }}>
@@ -143,7 +146,9 @@ export function ConsoleLayout() {
             {initials(user?.name, user?.email)}
           </span>
           <span style={{ minWidth: 0 }}>
-            <span style={{ display: "block", color: "#fff", overflow: "hidden", textOverflow: "ellipsis" }}>{user?.name || user?.email}</span>
+            <span style={{ display: "block", color: "#fff", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {user?.name || user?.email}
+            </span>
             <span style={{ fontSize: 12 }}>{user?.role}</span>
           </span>
         </div>
@@ -166,8 +171,7 @@ export function ConsoleLayout() {
     </div>
   );
 }
-
-function SideLink({ to, label, icon, count, section }: { to: string; label: string; icon: string; count?: number; section?: string }) {
+function SideLink({ to, label, icon, count, section }) {
   return (
     <>
       {section && <div className="side-section">{section}</div>}
@@ -179,8 +183,7 @@ function SideLink({ to, label, icon, count, section }: { to: string; label: stri
     </>
   );
 }
-
-export function ConsoleHead({ eyebrow, title, children }: { eyebrow?: string; title: string; children?: ReactNode }) {
+export function ConsoleHead({ eyebrow, title, children }) {
   return (
     <div className="console-head">
       <div>

@@ -110,7 +110,7 @@ def build_services(settings: Settings, *, db: Database | None = None, llm: LLMGa
     return Services(
         settings=settings, db=db, kv=kv, langfuse=langfuse, llm=llm, embedder=embedder, reranker=reranker,
         index=index, indexer=indexer, retriever=retriever, registry=registry,
-        clarify=ClarifyEngine(settings, registry, retriever, llm), triager=Triager(llm),
+        clarify=ClarifyEngine(settings, registry, retriever), triager=Triager(llm),
         resolver=Resolver(settings, llm, expand_kb), copilot=Copilot(llm), summarizer=Summarizer(llm),
         step_chat=StepChat(llm), notifications=notifications,
         outbox=OutboxDispatcher(settings, db, notifications), incidents=IncidentRadar(settings, db),

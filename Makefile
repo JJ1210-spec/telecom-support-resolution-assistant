@@ -6,7 +6,7 @@ endif
 .PHONY: install web check-keys seed demo updates api web-dev test lint eval drift discover up
 
 install:            ## python + node dependencies
-	python -m venv .venv && $(PY) -m pip install -e ".[dev,otel]" && cd frontend && npm ci
+	python -m venv .venv && $(PY) -m pip install -e ".[dev]" && cd frontend && npm ci
 web:                ## build the React app (served by the API at /)
 	cd frontend && npm run build
 check-keys:         ## ping every provider, show quota meters
@@ -24,7 +24,7 @@ web-dev:            ## Vite dev server on :5173 (proxies to :8000)
 test:
 	$(PY) -m pytest -q
 lint:
-	$(PY) -m ruff check src tests && cd frontend && npx tsc -b --noEmit
+	$(PY) -m ruff check src tests
 eval:               ## full evaluation + health report -> reports/
 	$(PY) -m telecom_assistant.cli eval --concurrency 1
 drift:

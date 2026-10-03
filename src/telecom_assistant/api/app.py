@@ -21,7 +21,7 @@ from ..gateways.kv import rate_limited
 from ..insights.stats import overview
 from ..notify.service import create_notify_app
 from ..services import Services, build_services
-from ..telemetry import configure_logging, log_event, metrics, setup_otel
+from ..telemetry import configure_logging, log_event, metrics
 from ..tickets.desk import Forbidden, NotFound, SupportDesk
 from ..tickets.lifecycle import HUMAN_QUEUE, OPEN, InvalidTransition
 from .security import (
@@ -167,7 +167,6 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
         if services.index.backend == "local":
             rebuilt = await services.indexer.rebuild_from_db()
             log_event("local_index_rebuilt", **rebuilt)
-        setup_otel(settings)
         workers = []
         if start_workers:
             workers = [asyncio.create_task(services.outbox.run()), asyncio.create_task(services.langfuse.run())]

@@ -69,8 +69,6 @@ class Settings:
     langfuse_public_key: str = ""
     langfuse_secret_key: str = ""
     langfuse_host: str = "https://cloud.langfuse.com"
-    otel_endpoint: str = ""
-    otel_headers: str = ""
 
     # Notifications
     email_transport: str = "outbox"  # outbox | smtp | resend
@@ -152,8 +150,6 @@ class Settings:
             langfuse_public_key=_env("LANGFUSE_PUBLIC_KEY"),
             langfuse_secret_key=_env("LANGFUSE_SECRET_KEY"),
             langfuse_host=_env("LANGFUSE_HOST", cls.langfuse_host).rstrip("/"),
-            otel_endpoint=_env("OTEL_EXPORTER_OTLP_ENDPOINT"),
-            otel_headers=_env("OTEL_EXPORTER_OTLP_HEADERS"),
             email_transport=_env("EMAIL_TRANSPORT", cls.email_transport),
             email_from=_env("EMAIL_FROM", cls.email_from),
             smtp_host=_env("SMTP_HOST"),
@@ -227,7 +223,6 @@ class Settings:
             "queue": "qstash" if self.qstash_token and self.public_base_url else "in-process",
             "email_transport": self.email_transport,
             "langfuse": bool(self.langfuse_public_key),
-            "otel": bool(self.otel_endpoint),
             "deploy_mode": self.deploy_mode,
             "thresholds": {
                 "min_retrieval_score": self.min_retrieval_score,
