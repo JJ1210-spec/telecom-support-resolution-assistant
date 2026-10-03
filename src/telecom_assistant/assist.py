@@ -6,22 +6,16 @@ import json
 import secrets
 import time
 import uuid
-from pathlib import Path
 from typing import Literal
 
 import httpx
 from fastapi import Depends, FastAPI, Header, HTTPException
-from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field, ValidationError
 
 from .config import Settings
 from .ollama import OllamaClient, OllamaError
+from .schemas import ResolveInput
 from .triage_rules import reconcile_triage
-
-
-class ResolveInput(BaseModel):
-    complaint: str = Field(min_length=5, max_length=5000)
-    product_hint: str | None = Field(default=None, max_length=100)
 
 
 class TriageResult(BaseModel):
@@ -112,10 +106,6 @@ def create_app(
     model = model or OllamaClient(settings.ollama_url, settings.embed_model, settings.chat_model)
     knowledge = knowledge or KnowledgeHTTPClient(settings.knowledge_url, settings.service_token())
     app = FastAPI(title="Telecom Assist API", version="0.1.0")
-
-    @app.get("/", include_in_schema=False)
-    def interface() -> FileResponse:
-        return FileResponse(Path(__file__).resolve().parents[2] / "web" / "index.html")
 
     def require_service(x_service_token: str | None = Header(default=None)) -> None:
         if not x_service_token or not secrets.compare_digest(x_service_token, settings.service_token()):
@@ -216,6 +206,9 @@ def create_app(
                            "total": round((time.perf_counter() - started) * 1000)},
         }
 
+    from .portal import install_portal
+
+    install_portal(app, settings, resolve)
     return app
 
 
