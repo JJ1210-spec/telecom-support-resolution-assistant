@@ -155,3 +155,11 @@ html, body { overflow-x: clip; }
 .bars-stacked .bar-label { display: flex; justify-content: space-between; gap: 8px; font-size: 14px; }
 .brand { white-space: nowrap; }
 @media (max-width: 640px) { .topnav .container { gap: 12px; } .topnav .btn-sm { padding: 0 12px; } }
+
+/* Tab bars never scroll or show a scrollbar; the tab header stays fixed while the panel content scrolls. */
+.tabs { overflow-y: hidden; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+.panel-head .tabs { overflow: visible; flex-wrap: nowrap; }
+.panel-head { position: sticky; top: 0; z-index: 2; background: inherit; }
+.panel.soft .panel-head { background: var(--surface-soft); }
+.panel:not(.soft):not(.dark) .panel-head { background: var(--canvas); }
