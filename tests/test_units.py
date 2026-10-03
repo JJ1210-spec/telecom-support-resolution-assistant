@@ -132,12 +132,12 @@ def test_psi_and_clustering():
     assert [len(c) for c in clusters] == [4, 3]
 
 
-def test_multilingual_p1_rules():
+def test_p1_rules_cover_paraphrases():
     base = {"intent": "connectivity.area_outage", "severity": "P2", "severity_drivers": []}
-    for text in ["Mere saath padosi bhi offline hain, poori gali affected lagti hai",
-                 "मेरे साथ पड़ोसी भी ऑफलाइन हैं, पूरी गली प्रभावित लगती है",
-                 "ONT par LOS laal jal raha hai, fibre service poori band hai",
-                 "ओ एन टी पर लाल एल ओ एस दिख रहा है और फाइबर सेवा बंद है",
+    for text in ["My neighbours are offline too and the whole street seems affected",
+                 "Everyone on our street has lost internet, not just my home",
+                 "The LOS lamp on the ONT is glowing red and the fibre service is totally down",
+                 "Red LOS indicator on the optical box and no fibre service at all",
                  "Our whole street has no brodband since morning"]:
         assert apply_rules(base, text, {})["severity"] == "P1", text
-    assert apply_rules({**base, "severity": "P3"}, "router kaam nahi kar raha", {})["severity"] == "P3"
+    assert apply_rules({**base, "severity": "P3"}, "my router is not working well", {})["severity"] == "P3"

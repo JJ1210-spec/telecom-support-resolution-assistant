@@ -29,7 +29,7 @@ Evaluation rows have `case_id`, `complaint`, `language`, `product_hint`, `expect
 
 ## Coverage and limits
 
-The data covers 16 issue families across home broadband, fiber, mobile, SIM/eSIM, billing, plan renewal, porting and TV. Complaints include English, Hindi and Hinglish; typos, abbreviations, prior troubleshooting, missing subject/product hint/device model, and insufficient-evidence cases are included. Some technical terms remain in English in multilingual complaints, as they often do in support conversations. All names, accounts, locations and outcomes are fictional.
+The data covers 16 issue families across home broadband, fiber, mobile, SIM/eSIM, billing, plan renewal, porting and TV. All complaints are in English and include paraphrases, typos, abbreviations, prior troubleshooting, missing subject/product hint/device model, and insufficient-evidence cases. All names, accounts, locations and outcomes are fictional.
 
 The generator uses a limited number of issue archetypes and many variations of them. As a result, a model may score well by learning the archetypes. Do not use this dataset alone to claim production accuracy. Before making that claim, obtain independently authored, human-reviewed evaluation cases and real-world outcome data under appropriate permissions. In particular, severity labels reflect these scenario templates, and the dataset does not measure real incident prevalence, class drift, or ticket volumes.
 

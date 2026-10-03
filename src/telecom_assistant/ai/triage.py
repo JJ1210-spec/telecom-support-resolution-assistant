@@ -21,20 +21,17 @@ from .prompts import TRIAGE_SYSTEM, TRIAGE_VERSION
 
 INJECTION = re.compile(r"ignore (all |any )?(previous|prior|above) (instructions|prompts)|system prompt|you are now",
                        re.IGNORECASE)
-CHURN = re.compile(r"\b(cancel|port[- ]?out|switch(ing)? (to|operator)|ombudsman|consumer court|trai|legal action|"
-                   r"band kar|chhod (dunga|denge))\b", re.IGNORECASE)
-# "kaam nahi kar raha" means "not working" in Hinglish, so bare "kaam" is deliberately not a work-impact cue.
-WORK = re.compile(r"work from home|\bwfh\b|office|business|meeting|client|exam|घर से काम|office ka kaam", re.IGNORECASE)
-EMERGENCY = re.compile(r"emergency|ambulance|hospital|elderly|112|911|safety|आपातकाल", re.IGNORECASE)
+CHURN = re.compile(r"\b(cancel|port[- ]?out|switch(ing)? (to|operator)|ombudsman|consumer court|regulator|"
+                   r"legal action)\b", re.IGNORECASE)
+WORK = re.compile(r"work from home|\bwfh\b|office|business|meeting|client|exam", re.IGNORECASE)
+EMERGENCY = re.compile(r"emergency|ambulance|hospital|elderly|112|911|safety", re.IGNORECASE)
 AREA = re.compile(r"whole (street|building|area|colony)|entire (building|area|street)|several (flats|homes|houses)|"
-                  r"neighbou?rs|everyone in|पूरी (इमारत|गली)|पड़ोसी|poo?ri (building|gali|society)|padosi|"
-                  r"sab ka|sabka", re.IGNORECASE)
+                  r"neighbou?rs|everyone (in|on)|our street", re.IGNORECASE)
 TOTAL_LOSS = re.compile(r"no (internet|broa?d?band|brodband|service|signal)|internet is down|completely down|offline|"
-                        r"not working at all|net band|net bilkul nahi|service (poori )?band|इंटरनेट बंद|सेवा बंद|"
-                        r"ऑफलाइन|dead", re.IGNORECASE)
-LOS = re.compile(r"\blos\b|एल\s?ओ\s?एस|लॉस", re.IGNORECASE)
-RED = re.compile(r"red|लाल|\bla+l\b", re.IGNORECASE)
-REPEAT = re.compile(r"again|every (day|evening|night)|more than once|repeated|third time|roz|बार बार|bar bar|"
+                        r"not working at all|lost (internet|service|connection)|dead", re.IGNORECASE)
+LOS = re.compile(r"\blos\b", re.IGNORECASE)
+RED = re.compile(r"\bred\b", re.IGNORECASE)
+REPEAT = re.compile(r"again|every (day|evening|night)|more than once|repeated|third time|"
                     r"already (restarted|tried|called)", re.IGNORECASE)
 SEVERITY_ORDER = {"P1": 1, "P2": 2, "P3": 3, "P4": 4}
 

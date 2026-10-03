@@ -21,7 +21,7 @@ The detailed design is in [architecture.md](architecture.md); this page is the v
 ## 2. The problem
 
 - Customers describe the same issue in many ways: "internet drops at night", "WiFi cuts out after 7pm",
-  "net bar bar band ho raha hai". Keyword search misses these matches.
+  "line sync lost during peak hours". Keyword search misses these matches.
 - Agents waste time on repeat issues, answer quality varies, and customers repeat themselves at every handoff.
 - The goal is to **solve the easy cases instantly and safely, and make the hard cases faster for humans**,
   without the AI ever making things up or promising things it can't deliver.
@@ -45,7 +45,7 @@ flowchart LR
   I --> J[Summary saved to<br/>knowledge base]
 ```
 
-1. **Intake.** The customer picks a topic chip (Swiggy-style), writes a sentence in any language, and answers
+1. **Intake.** The customer picks a topic chip (Swiggy-style), writes a sentence in their own words, and answers
    2–4 quick questions. Each question is the one that rules out the most possibilities.
 2. **Search.** The system finds the most similar *resolved* past tickets and knowledge-base (KB) articles, by
    meaning and by keywords.
@@ -82,14 +82,14 @@ maths, so it is fast, free and explainable.
 Each ticket and each KB section is stored twice in Qdrant: as a meaning vector (Jina embeddings) and as keyword
 weights (BM25). Both searches run, and the two ranked lists are merged with Reciprocal Rank Fusion. Tickets
 whose fixes customers confirmed get a small boost. A reranker model then reorders the top results.
-*Why both:* meaning search handles paraphrases and Hindi; keyword search handles exact terms like "LOS" or
+*Why both:* meaning search handles paraphrases and typos; keyword search handles exact terms like "LOS" or
 error codes.
 
 **Classification, `ai/triage.py`.**
 The LLM receives the *current* list of issue types (read from the database), so a new issue type needs no
 retraining. The final confidence combines the LLM's confidence, agreement with similar past tickets (k-NN),
 and the customer's intake answers. Deterministic rules add safety on top. For example, "whole street has no
-internet" or a red LOS light always makes the ticket P1, in English, Hindi or Hinglish.
+internet" or a red LOS light always makes the ticket P1.
 
 **Grounded drafting, `ai/resolver.py`.**
 The LLM may only use the supplied sources, and every step must cite one. Code enforces this, not just the

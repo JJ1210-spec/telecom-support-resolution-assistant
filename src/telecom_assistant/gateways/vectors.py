@@ -21,9 +21,9 @@ import numpy as np
 
 from ..telemetry import metrics
 
-TOKEN = re.compile(r"[\wऀ-ॿ]+", re.UNICODE)
+TOKEN = re.compile(r"\w+")
 STOP = {"the", "a", "an", "and", "or", "to", "of", "in", "on", "is", "it", "my", "i", "me", "for", "this", "that",
-        "with", "but", "be", "are", "was", "have", "has", "not", "at", "please", "hai", "ka", "ki", "ke", "se"}
+        "with", "but", "be", "are", "was", "have", "has", "not", "at", "please"}
 K1, B, AVG_DL = 1.2, 0.75, 60.0
 
 

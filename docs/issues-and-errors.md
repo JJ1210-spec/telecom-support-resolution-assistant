@@ -152,6 +152,12 @@ This log records issues found during the project. Keep the original symptom, att
   - four-model chains with independent quotas (`gemini-3.1-flash-lite` and `gpt-oss-20b` added);
   - smaller draft prompts (the triaged article in full, other articles only their self-help sections; 3 past cases);
   - degraded triage borrows the severity of the nearest resolved cases;
-  - multilingual P1 rules: Hindi/Hinglish "padosi offline", "poori gali", "LOS laal", "एल ओ एस लाल" were missed before, and bare "kaam" was removed from the work-impact cue because "kaam nahi kar raha" means "not working";
+  - broader P1 rules: outage and LOS phrasings that were not matched before;
   - evals run sequentially by default and also report metrics on the LLM-available subset.
-- **Verification:** new tests cover the limiter window maths, the 429 cooldown (breaker stays closed) and the multilingual P1 phrases. The sequential re-run `reports/eval_20261003_183348.md` had a 1.8% degraded rate (was 69.6%), P1 recall 100% (was 50%), intent macro-F1 1.000 and 0 unsafe routes.
+- **Verification:** new tests cover the limiter window maths, the 429 cooldown (breaker stays closed) and the new P1 phrasings. The sequential re-run `reports/eval_20261003_183348.md` had a 1.8% degraded rate (was 69.6%), P1 recall 100% (was 50%), intent macro-F1 1.000 and 0 unsafe routes.
+
+## P6-006 Project scoped to English only — done
+
+- **Phase:** 6.
+- **Change:** As requested, the dataset generator now produces English complaints only. The 32 non-English held-out eval cases were replaced by English paraphrases, so the eval keeps all 56 cases. The two non-English "unclear complaint" cases are now English. Non-English severity patterns, non-Latin tokenisation and multi-language prompt instructions were removed. The hosted corpus was re-seeded in place: 157 resolved and 76 unresolved records were updated, and the rest were unchanged. Four non-English demo tickets were replaced with English ones.
+- **Verification:** the dataset validator asserts English-only. A new test covers English P1 paraphrases ("everyone on our street has lost internet", "red LOS indicator"). The eval was re-run on the English dataset (see the README).

@@ -13,7 +13,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-ROOT = Path(__file__).resolve().parents[2]
+# Project root (data/, frontend/dist, .env). Set APP_ROOT when the package is installed into site-packages (Docker).
+ROOT = Path(os.getenv("APP_ROOT") or Path(__file__).resolve().parents[2])
 
 
 def _env(name: str, default: str = "") -> str:

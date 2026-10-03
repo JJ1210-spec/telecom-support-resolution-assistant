@@ -75,18 +75,12 @@
     }
   },
   "languages_resolved": {
-    "hinglish": 32,
-    "en": 128,
-    "hi": 32
+    "en": 192
   },
   "languages_unresolved": {
-    "en": 64,
-    "hi": 16,
-    "hinglish": 16
+    "en": 96
   },
   "languages_eval": {
-    "hi": 17,
-    "en": 22,
-    "hinglish": 17
+    "en": 56
   }
 }

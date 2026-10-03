@@ -169,7 +169,7 @@ Tickets and KB sections are separate Qdrant collections, accessed through aliase
 One batched query returns both rank lists for each collection; the two collections are searched concurrently.
 The lists are fused with RRF (k=60) and multiplied by an **outcome weight** (0.85 + 0.3 × outcome score).
 The outcome score is learned from customers' worked / didn't-work ticks. Results are then reranked by Jina's
-multilingual cross-encoder.
+cross-encoder.
 
 The dense cosine is kept separately because it is calibrated enough to gate on (abstention, OOD and
 recurrence), which RRF scores are not. KB articles are chunked per section (`#summary`, `#h1..` customer

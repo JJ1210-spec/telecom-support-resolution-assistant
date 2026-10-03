@@ -40,7 +40,7 @@ def validate() -> dict:
     assert all(set(r["relevant_kb_ids"]) <= kb_ids for r in evals)
     assert all(not r["relevant_kb_ids"] and r["should_abstain"] for r in evals if r["expected_intent"] == "other")
     assert all(r["source"] == "synthetic_telecom_v1" for r in resolved + unresolved + articles + evals)
-    assert {r["language"] for r in resolved + unresolved + evals} == {"en", "hinglish", "hi"}
+    assert {r["language"] for r in resolved + unresolved + evals} == {"en"}, "dataset must be English-only"
     assert all(r["record_version"] == 1 for r in resolved + unresolved)
     assert len({r["event_id"] for r in events}) == len(events)
     unresolved_ids = {r["ticket_id"] for r in unresolved}

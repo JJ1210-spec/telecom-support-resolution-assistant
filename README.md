@@ -13,6 +13,8 @@ confirmed resolution to the knowledge base.
 
 > **Preparing to explain it? Start with [docs/INTERVIEW_GUIDE.md](docs/INTERVIEW_GUIDE.md).**
 >
+> **Deploying it online? Follow [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).**
+>
 > Architecture, algorithms, scaling and design decisions: **[docs/architecture.md](docs/architecture.md)** ·
 > Product requirements: `../docs/PRD.md` · Problem log: [docs/issues-and-errors.md](docs/issues-and-errors.md)
 

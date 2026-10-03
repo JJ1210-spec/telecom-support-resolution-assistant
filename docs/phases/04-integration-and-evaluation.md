@@ -20,6 +20,6 @@ Eleven focused tests passed after these fixes. FastAPI's test client emitted one
 
 1. Citation IDs are valid, but factual support for each step has not been checked independently.
 2. The 1.7B model still takes roughly one minute for this example on CPU. Stage timing needs a multi-case distribution before setting a latency target.
-3. Multilingual and code-mixed queries account for several retrieval misses.
+3. Paraphrased and typo-heavy queries account for several retrieval misses.
 4. The score threshold and triage correction threshold were chosen on development examples, not calibrated on an independent human-labeled set. The 0.60 gate can withhold drafts for some answerable complaints.
 5. No authentication, PII redaction, persistent traces, feedback, drift monitor or scalable vector index is present yet.

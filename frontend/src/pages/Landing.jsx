@@ -4,7 +4,7 @@ import { homeFor, useAuth } from "../hooks/useAuth";
 const STEPS = [
   {
     title: "Tell us in your words",
-    body: "Pick a topic or just describe it — English, Hindi or Hinglish. No forms, no account numbers.",
+    body: "Pick a topic or just describe it in your own words. No forms, no account numbers.",
   },
   {
     title: "We narrow it down",
@@ -64,7 +64,6 @@ const FAQ = [
     q: "Is my personal information safe?",
     a: "Phone numbers, emails, card and account numbers are removed before any AI processing. Never share passwords or OTPs — we will never ask for them.",
   },
-  { q: "Which languages are supported?", a: "English, Hindi and Hinglish today, including typos and mixed scripts." },
 ];
 export default function Landing() {
   const { user, logout } = useAuth();
@@ -183,24 +182,6 @@ export default function Landing() {
               </div>
             </div>
           </div>
-        </div>
-        <div className="container">
-          <div className="stat-strip">
-            {[
-              ["100%", "issues classified correctly"],
-              ["0", "unsafe automated answers"],
-              ["~5 s", "to a grounded answer"],
-              ["3.8", "questions on average"],
-            ].map(([v, l]) => (
-              <div key={l}>
-                <div className="big">{v}</div>
-                <div className="lbl">{l}</div>
-              </div>
-            ))}
-          </div>
-          <p className="caption" style={{ color: "#5b616e", paddingBottom: 28, marginTop: -8 }}>
-            Measured on 56 held-out test complaints (synthetic data) — see the evaluation report.
-          </p>
         </div>
       </section>
 

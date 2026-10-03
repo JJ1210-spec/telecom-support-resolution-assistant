@@ -23,7 +23,7 @@ import sqlalchemy as sa
 from ..db import Database, bytes_to_vec, embedding_cache, vec_to_bytes
 from ..telemetry import metrics
 
-TOKEN = re.compile(r"[\wऀ-ॿ]+", re.UNICODE)
+TOKEN = re.compile(r"\w+")
 
 
 class EmbeddingError(RuntimeError):

@@ -36,3 +36,5 @@ New capabilities, mapped to the brief:
 ## Remaining limitations
 
 See `docs/architecture.md` §10.
+
+The project is scoped to English only (see issue P6-006).

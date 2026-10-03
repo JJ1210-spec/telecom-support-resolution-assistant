@@ -8,7 +8,7 @@ RUN npm run build
 
 # ---------- python runtime ----------
 FROM python:3.12-slim AS app
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 APP_ROOT=/app
 WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY src ./src
@@ -18,5 +18,5 @@ COPY --from=web /web/dist ./frontend/dist
 RUN useradd --create-home appuser && mkdir -p /app/.runtime && chown -R appuser /app
 USER appuser
 EXPOSE 8000
-HEALTHCHECK --interval=30s --timeout=5s CMD python -c "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/health')"
-CMD ["sh", "-c", "uvicorn telecom_assistant.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers"]
+HEALTHCHECK --interval=30s --timeout=5s CMD sh -c "python -c \"import urllib.request;urllib.request.urlopen('http://127.0.0.1:${PORT:-8000}/health')\""
+CMD ["sh", "-c", "uvicorn telecom_assistant.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips=*"]

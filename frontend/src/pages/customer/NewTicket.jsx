@@ -183,7 +183,7 @@ export default function NewTicket() {
                 <div className="eyebrow">{issueLabel ?? areaLabel ?? "Describe the problem"}</div>
                 <h1 className="display-sm">{issueLabel ? "Tell us a bit more" : "What's going wrong?"}</h1>
                 <label className="field">
-                  <span className="label">In your own words — any language is fine</span>
+                  <span className="label">In your own words</span>
                   <textarea
                     className="textarea"
                     autoFocus

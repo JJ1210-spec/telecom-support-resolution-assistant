@@ -217,7 +217,7 @@ class Resolver:
         user = (f"<complaint>\n{complaint[:3000]}\n</complaint>\n<triage>{json.dumps(self._triage_view(triage))}"
                 f"</triage>\n<already_tried>{json.dumps(tried)}</already_tried>\n<sources>\n" + "\n".join(rendered)
                 + "\n</sources>")
-        system = DRAFT_SYSTEM.replace("{language}", triage.get("language") or "en")
+        system = DRAFT_SYSTEM
         try:
             result = await self.llm.json("draft", system, user, DraftOut, max_tokens=1000, trace_id=trace_id,
                                          name="draft")
