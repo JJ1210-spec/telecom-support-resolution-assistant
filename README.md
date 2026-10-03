@@ -86,25 +86,25 @@ displays. It reports:
 - citation validity and LLM-judged step support;
 - per-stage latency and degraded-mode rates.
 
-### Latest results ([`reports/eval_20261003_183348.md`](reports/eval_20261003_183348.md), hosted stack, synthetic held-out set)
+### Latest results ([`reports/eval_20261003_195637.md`](reports/eval_20261003_195637.md), hosted stack, English synthetic held-out set)
 
 | Metric | Result | Target |
 |---|---|---|
-| Intent macro-F1 (en / hi / Hinglish all 100%) | **1.000** | ≥ 0.80 |
+| Intent macro-F1 | **1.000** | ≥ 0.80 |
 | Product accuracy | **100%** | ≥ 90% |
 | P1 recall | **100%** | ≥ 95% |
-| Severity macro-F1 | 0.652 | ≥ 0.70 (P2/P3 boundary misses) |
+| Severity macro-F1 | 0.544 | ≥ 0.70 (P2/P3 boundary misses) |
 | Unsafe self-service routes (P1 or unanswerable) | **0** | 0 |
-| Citation validity / LLM-judged step support | **100% / 100%** | 100% / ≥ 90% |
-| Abstention precision / recall | 77.8% / 87.5% | ≥ 85% recall |
-| KB Recall@5: dense / sparse / hybrid / **hybrid + rerank** | 1.000 / 0.583 / 0.979 / **1.000** | ≥ 0.85 |
-| Intent accuracy: complaint only → after adaptive questions | 95.8% → **100%** (3.8 questions, 1.84 bits) | n/a |
-| End-to-end latency p50 / p95 | 5.7 s / 24.5 s | ≤ 8 s p95 |
-| Degraded-mode rate | 1.8% | < 5% |
+| Citation validity / LLM-judged step support | **100% / 100%** (33 steps) | 100% / ≥ 90% |
+| Abstention precision / recall | 66.7% / **100%** | ≥ 85% recall |
+| KB Recall@5: dense / sparse / hybrid / hybrid + rerank | 0.979 / 0.812 / 0.958 / **0.979** | ≥ 0.85 |
+| Intent accuracy: complaint only → after adaptive questions | 93.8% → **100%** (3.6 questions, 1.56 bits) | n/a |
+| End-to-end latency p50 / p95 | 5.4 s / 27.3 s | ≤ 8 s p95 |
+| Degraded-mode rate | **0%** | < 5% |
 
 The p95 latency comes from free-tier per-minute limits (15 RPM Gemini, 8k TPM Groq): the gateway paces calls and
-then fails over to slower backup models. The first eval run, with no pacing, is kept as
-[`reports/eval_20261003_181606.md`](reports/eval_20261003_181606.md) to show that failure mode (see issue P6-005).
+fails over to slower backup models rather than failing (see issue P6-005). Severity is the weakest metric:
+critical outages are always caught, but medium vs low priority (P2/P3) is often off by one level.
 
 At runtime:
 

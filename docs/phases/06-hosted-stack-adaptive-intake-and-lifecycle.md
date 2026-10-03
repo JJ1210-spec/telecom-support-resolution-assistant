@@ -31,7 +31,7 @@ New capabilities, mapped to the brief:
 - **Automated tests:** 27 tests covering unit logic, the end-to-end lifecycle and infrastructure all pass, and Ruff is clean.
 - **Frontend:** the Vite production build passes.
 - **Live run on the hosted stack:** intake (posterior 0.50 → 0.96 after one question) → ticket → grounded steps → step chat → all steps failed → escalated → copilot → agent quick-reply question → customer answer → proposal → confirmation → learned summary + 4 emails.
-- **Evaluation:** `reports/eval_20261003_183348.md` on the 56 held-out cases: intent macro-F1 1.000, product accuracy 100%, P1 recall 100%, 0 unsafe self-service routes, citation validity 100%, judged step support 100% (35 steps), KB Recall@5 1.000 with hybrid + rerank, degraded rate 1.8%. Severity macro-F1 is 0.652, below the 0.70 target; the misses are P2/P3 boundary cases.
+- **Evaluation:** `reports/eval_20261003_195637.md` on the 56 English held-out cases: intent macro-F1 1.000, product accuracy 100%, P1 recall 100%, 0 unsafe self-service routes, citation validity 100%, judged step support 100% (33 steps), abstention recall 100%, KB Recall@5 0.979 with hybrid + rerank, degraded rate 0%. Severity macro-F1 is 0.544, below the 0.70 target; the misses are P2/P3 boundary cases.
 
 ## Remaining limitations
 

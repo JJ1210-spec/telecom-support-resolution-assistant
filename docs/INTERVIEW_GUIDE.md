@@ -160,21 +160,22 @@ If every model is down, the ticket is still saved and goes to a human; nothing i
 
 ## 6. Numbers to quote
 
-From `reports/eval_20261003_183348.md`: 56 held-out test complaints (never indexed), synthetic data.
+From `reports/eval_20261003_195637.md`: 56 held-out English test complaints (never indexed), synthetic data.
 
 | What | Result |
 |---|---|
-| Issue classification (macro-F1), English / Hindi / Hinglish | 1.00 (100% each) |
+| Issue classification (macro-F1) | 1.00 (100%) |
 | P1 (critical outage) recall | 100% |
 | Unsafe automated answers on critical or unclear cases | 0 |
 | Steps citing a real source / judged as supported by an independent LLM | 100% / 100% |
-| Finding the right KB article in the top 5 (hybrid + rerank) | 100% (keyword-only: 58%) |
-| Accuracy from complaint alone → after questions | 95.8% → 100% |
+| Finding the right KB article in the top 5 (hybrid + rerank) | 97.9% (keyword-only: 81%) |
+| Accuracy from complaint alone → after questions | 93.8% → 100% |
+| Unclear complaints correctly sent to a human (abstention recall) | 100% |
 | Typical response time | ~5–6 s |
 
 **Be honest about these:**
 
-- Severity F1 is 0.65 (target 0.70); the misses are medium vs low priority.
+- Severity F1 is 0.54 (target 0.70). Critical outages are always caught; the misses are medium vs low priority.
 - p95 latency is ~25 s, caused by free-tier per-minute limits.
 - The data is synthetic, so these numbers are a development baseline, not production accuracy.
 
@@ -258,7 +259,7 @@ before. A job clusters them, an LLM names each cluster, and an admin approves it
 taxonomy, so the next ticket can be classified as the new type with no retraining.
 
 **Q: Why ask questions instead of just using the LLM?**
-They are cheaper, faster and measurable. Intent accuracy goes from 95.8% to 100% with about 3–4 taps, and the
+They are cheaper, faster and measurable. Intent accuracy goes from 93.8% to 100% with about 3–4 taps, and the
 UI shows the uncertainty dropping.
 
 **Q: What is PSI?**

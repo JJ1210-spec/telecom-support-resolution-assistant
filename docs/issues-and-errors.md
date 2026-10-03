@@ -144,7 +144,7 @@ This log records issues found during the project. Keep the original symptom, att
 ## P6-005 Rate-limit storm degraded 70% of the first live eval — resolved
 
 - **Phase:** 6, evaluation.
-- **Observed:** `reports/eval_20261003_181606.md` (3 concurrent cases) showed `triage_llm_unavailable` 28× and `draft_llm_unavailable` 38×. P1 recall fell to 50% and 54/56 cases routed to humans. When the LLM was reachable, quality was high: intent macro-F1 0.936, 100% citation validity, 100% judged step support, 0 unsafe routes.
+- **Observed:** The first live eval run (3 concurrent cases, earlier dataset) showed `triage_llm_unavailable` 28× and `draft_llm_unavailable` 38×. P1 recall fell to 50% and 54/56 cases routed to humans. When the LLM was reachable, quality was high: intent macro-F1 0.936, 100% citation validity, 100% judged step support, 0 unsafe routes.
 - **Cause:** A burst probe confirmed the free-tier limits: Gemini Flash-Lite allows 15 requests/min, and Groq gpt-oss-120b allows 8,000 tokens/min (about two drafts a minute). The gateway treated 429s as failures, so the circuit breakers opened on both providers, and the chains held only two models.
 - **Resolution:**
   - per-model sliding-window RPM/TPM limiter (wait at most 6 s, otherwise fail over);
@@ -154,10 +154,10 @@ This log records issues found during the project. Keep the original symptom, att
   - degraded triage borrows the severity of the nearest resolved cases;
   - broader P1 rules: outage and LOS phrasings that were not matched before;
   - evals run sequentially by default and also report metrics on the LLM-available subset.
-- **Verification:** new tests cover the limiter window maths, the 429 cooldown (breaker stays closed) and the new P1 phrasings. The sequential re-run `reports/eval_20261003_183348.md` had a 1.8% degraded rate (was 69.6%), P1 recall 100% (was 50%), intent macro-F1 1.000 and 0 unsafe routes.
+- **Verification:** new tests cover the limiter window maths, the 429 cooldown (breaker stays closed) and the new P1 phrasings. The sequential re-run had a 1.8% degraded rate (was 69.6%), P1 recall 100% (was 50%), intent macro-F1 1.000 and 0 unsafe routes.
 
 ## P6-006 Project scoped to English only — done
 
 - **Phase:** 6.
 - **Change:** As requested, the dataset generator now produces English complaints only. The 32 non-English held-out eval cases were replaced by English paraphrases, so the eval keeps all 56 cases. The two non-English "unclear complaint" cases are now English. Non-English severity patterns, non-Latin tokenisation and multi-language prompt instructions were removed. The hosted corpus was re-seeded in place: 157 resolved and 76 unresolved records were updated, and the rest were unchanged. Four non-English demo tickets were replaced with English ones.
-- **Verification:** the dataset validator asserts English-only. A new test covers English P1 paraphrases ("everyone on our street has lost internet", "red LOS indicator"). The eval was re-run on the English dataset (see the README).
+- **Verification:** the dataset validator asserts English-only. A new test covers English P1 paraphrases ("everyone on our street has lost internet", "red LOS indicator"). The eval was re-run on the English dataset (`reports/eval_20261003_195637.md`): intent macro-F1 1.000, P1 recall 100%, 0 unsafe routes, 0% degraded; severity macro-F1 0.544.
