@@ -15,7 +15,7 @@ import pytest
 import sqlalchemy as sa
 from pydantic import BaseModel
 
-from telecom_assistant.db import outbox, steps, utc_now
+from telecom_assistant.db import discovery_pool, outbox, steps, tickets, utc_now
 from telecom_assistant.gateways.kv import MemoryKV
 from telecom_assistant.gateways.llm import CircuitBreaker, LLMGateway, LLMUnavailable, ProviderError
 from telecom_assistant.knowledge.indexer import StaleVersion
@@ -173,6 +173,29 @@ def test_kb_deprecation_is_immediate(services):
     assert asyncio.run(services.indexer.upsert_kb({**article, "version": 2, "status": "deprecated"})) == "status_changed"
     after = asyncio.run(services.retriever.search("TV picture pixelating set-top box", top_kb=10))
     assert not any(s["kb_id"] == "KB-TV-PIXEL" for s in after.kb)
+
+
+def test_discovery_pool_shows_full_redacted_complaints(services):
+    from telecom_assistant.api.security import Accounts
+
+    owner = Accounts(services.db).create("discovery@test.dev", "correct-horse-battery")
+    complaint = "Intermittent connection. " * 120
+    now = utc_now()
+    with services.db.tx() as con:
+        for ticket_id in ("TCK-OLD", "TCK-NEW"):
+            con.execute(tickets.insert().values(id=ticket_id, owner_id=owner["id"], complaint=complaint,
+                                                complaint_redacted=complaint, status="escalated",
+                                                created_at=now, updated_at=now))
+        con.execute(discovery_pool.insert().values(ticket_id="TCK-OLD", text=complaint[:2000],
+                                                   reason="other", created_at=now))
+    services.discovery.add("TCK-NEW", complaint, "other", None)
+    pool = {row["ticket_id"]: row for row in services.discovery.pool()}
+    assert pool["TCK-OLD"]["text"] == complaint
+    assert pool["TCK-NEW"]["text"] == complaint
+    with services.db.read() as con:
+        stored = con.execute(sa.select(discovery_pool.c.text).where(
+            discovery_pool.c.ticket_id == "TCK-NEW")).scalar_one()
+    assert stored == complaint
 
 
 def test_incident_radar_groups_similar_tickets_in_one_region(services):

@@ -63,7 +63,7 @@ class Discovery:
         with self.db.tx() as con:
             exists = con.execute(sa.select(discovery_pool.c.id).where(discovery_pool.c.ticket_id == ticket_id)).first()
             if not exists:
-                con.execute(discovery_pool.insert().values(ticket_id=ticket_id, text=text[:2000], reason=reason,
+                con.execute(discovery_pool.insert().values(ticket_id=ticket_id, text=text, reason=reason,
                                                            embedding=vec_to_bytes(vector) if vector else None,
                                                            created_at=utc_now()))
 
@@ -71,9 +71,12 @@ class Discovery:
         with self.db.read() as con:
             rows = con.execute(sa.select(discovery_pool.c.id, discovery_pool.c.ticket_id, discovery_pool.c.text,
                                          discovery_pool.c.reason, discovery_pool.c.proposal_id,
-                                         discovery_pool.c.created_at)
+                                         discovery_pool.c.created_at, tickets.c.complaint_redacted.label("ticket_text"))
+                               .outerjoin(tickets, tickets.c.id == discovery_pool.c.ticket_id)
                                .order_by(discovery_pool.c.created_at.desc()).limit(200)).all()
-        return [{**dict(r._mapping), "created_at": r.created_at.isoformat()} for r in rows]
+        return [{"id": r.id, "ticket_id": r.ticket_id, "text": r.ticket_text or r.text,
+                 "reason": r.reason, "proposal_id": r.proposal_id,
+                 "created_at": r.created_at.isoformat()} for r in rows]
 
     async def run(self, threshold: float = 0.72, min_size: int = 3) -> dict:
         with self.db.read() as con:

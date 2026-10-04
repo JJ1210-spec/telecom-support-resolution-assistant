@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../../api/client";
 import { Icon } from "../../components/Icon";
 import { ConsoleHead } from "../../components/Layout";
@@ -137,6 +138,7 @@ export function TaxonomyPage() {
   const tax = useResource(() => api.get("/v1/admin/taxonomy"), []);
   const disc = useResource(() => api.get("/v1/admin/discovery"), []);
   const [busy, setBusy] = useState(false);
+  const [visiblePool, setVisiblePool] = useState(12);
   const [toast, showToast] = useToast();
   const runDiscovery = async () => {
     setBusy(true);
@@ -161,6 +163,7 @@ export function TaxonomyPage() {
     }
   };
   const pending = (disc.data?.proposals ?? []).filter((p) => p.status === "pending");
+  const pool = disc.data?.pool ?? [];
   return (
     <div className="stack-lg">
       <ConsoleHead eyebrow={`Taxonomy v${tax.data?.version ?? "…"}`} title="Taxonomy & discovery">
@@ -249,28 +252,48 @@ export function TaxonomyPage() {
         <div className="stack">
           <div className="card-sm stack-sm">
             <div className="eyebrow">Discovery pool</div>
-            {!disc.data?.pool.length && (
+            {!pool.length && (
               <div className="caption">Empty — tickets land here when they don't fit any class.</div>
             )}
-            {disc.data?.pool.slice(0, 12).map((p) => (
+            {pool.slice(0, visiblePool).map((p) => (
               <div
                 key={p.ticket_id}
                 className="body-sm"
                 style={{ borderTop: "1px solid var(--hairline-soft)", paddingTop: 6 }}
               >
-                <span className="badge" style={{ marginRight: 6 }}>
-                  {p.reason.replace(/_/g, " ")}
-                </span>
-                {p.text.slice(0, 120)}
+                <div className="row" style={{ gap: 8 }}>
+                  <span className="badge">{p.reason.replace(/_/g, " ")}</span>
+                  <Link to={`/console/tickets/${p.ticket_id}`} className="mono caption">
+                    {p.ticket_id}
+                  </Link>
+                </div>
+                <div style={{ marginTop: 6, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{p.text}</div>
               </div>
             ))}
+            {visiblePool < pool.length && (
+              <button className="btn btn-text btn-sm" onClick={() => setVisiblePool((count) => count + 12)}>
+                Show more ({pool.length - visiblePool} remaining)
+              </button>
+            )}
           </div>
           <div className="card-sm stack-sm">
             <div className="eyebrow">Version history</div>
             {tax.data?.history.map((h) => (
-              <div key={h.version} className="body-sm">
-                <span className="mono">v{h.version}</span> · {h.created_by} ·{" "}
-                <span className="caption">{JSON.stringify(h.changelog).slice(0, 90)}</span>
+              <div key={h.version} className="body-sm" style={{ borderTop: "1px solid var(--hairline-soft)", paddingTop: 8 }}>
+                <div>
+                  <span className="mono">v{h.version}</span> · {h.created_by} · {ago(h.created_at)}
+                </div>
+                <div style={{ overflowWrap: "anywhere" }}>
+                  {h.changelog?.action
+                    ? `${h.changelog.action} · ${h.changelog.intent ?? "taxonomy"}`
+                    : `Added ${h.changelog?.added?.length ?? 0} classes`}
+                </div>
+                <details>
+                  <summary className="caption" style={{ cursor: "pointer" }}>View full changes</summary>
+                  <pre style={{ margin: "8px 0 0", whiteSpace: "pre-wrap", overflowWrap: "anywhere", fontSize: 12 }}>
+                    {JSON.stringify(h.changelog, null, 2)}
+                  </pre>
+                </details>
               </div>
             ))}
           </div>

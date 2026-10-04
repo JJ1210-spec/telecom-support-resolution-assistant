@@ -115,7 +115,7 @@ At runtime:
 ## Tests
 
 ```bash
-.venv/Scripts/python -m pytest -q          # 29 tests, no network: fake LLM, hash embedder, local index, SQLite
+.venv/Scripts/python -m pytest -q          # 30 tests, no network: fake LLM, hash embedder, local index, SQLite
 .venv/Scripts/python -m ruff check src tests
 cd frontend && npm run build
 ```
