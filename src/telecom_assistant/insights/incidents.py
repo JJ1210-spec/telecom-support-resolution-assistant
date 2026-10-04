@@ -3,7 +3,7 @@
 When a new ticket is analyzed, it is compared with open tickets from the last N hours in the same region:
 same intent family and a complaint-embedding cosine >= threshold. Once at least `incident_min_tickets`
 match, an incident is opened (or the ticket joins the existing one). Linked customers are told it is a
-known issue (no duplicate troubleshooting), agents work one incident instead of N tickets, and resolving
+known issue (no duplicate troubleshooting), admins work one incident instead of N tickets, and resolving
 the incident proposes the fix to every linked ticket for confirmation.
 """
 

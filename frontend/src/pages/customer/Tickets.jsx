@@ -254,7 +254,7 @@ export function TicketDetail() {
           <div className="panel-head">
             <div className="tabs customer-tabs" role="tablist">
               <button className={`tab${tab === "steps" ? " active" : ""}`} onClick={() => setTab("steps")}>
-                {t.steps[0]?.origin === "agent" ? "Solution" : "Steps"}
+                {t.steps[0]?.origin !== "ai" ? "Solution" : "Steps"}
                 <span className="count">{t.steps.length}</span>
               </button>
               <button className={`tab${tab === "timeline" ? " active" : ""}`} onClick={() => setTab("timeline")}>
@@ -286,17 +286,17 @@ export function TicketDetail() {
                     status === "worked"
                       ? "Great — glad that helped"
                       : status === "did_not_work"
-                        ? "Thanks — noted for your specialist"
+                        ? "Thanks — noted for your admin"
                         : undefined,
                   )
                 }
                 onSolved={() =>
                   act(() => api.post(`/v1/tickets/${t.id}/confirm`, { solved: true }), "Ticket resolved — thank you!")
                 }
-                onSpecialist={() =>
+                onAdmin={() =>
                   act(
-                    () => api.post(`/v1/tickets/${t.id}/escalate`, { text: "Customer asked for a specialist" }),
-                    "A specialist will take it from here",
+                    () => api.post(`/v1/tickets/${t.id}/escalate`, { text: "Customer asked for an admin" }),
+                    "An admin will take it from here",
                   )
                 }
                 onRate={(rating) =>
@@ -386,7 +386,7 @@ export function TicketDetail() {
             setReopenOpen(false);
             await act(
               () => api.post(`/v1/tickets/${t.id}/confirm`, { solved: false, note }),
-              "Sent back to a specialist",
+              "Sent back to an admin",
             );
           }}
         />
@@ -395,7 +395,7 @@ export function TicketDetail() {
     </section>
   );
 }
-function StepsTab({ ticket: t, busy, open, anyWorked, onStatus, onChat, onSource, onSolved, onSpecialist, onRate }) {
+function StepsTab({ ticket: t, busy, open, anyWorked, onStatus, onChat, onSource, onSolved, onAdmin, onRate }) {
   return (
     <div className="stack">
       {!open && (
@@ -414,14 +414,14 @@ function StepsTab({ ticket: t, busy, open, anyWorked, onStatus, onChat, onSource
       )}
       {t.analysis_state === "running" && <p className="muted body-sm">Steps will appear here in a few seconds.</p>}
       {t.analysis_state !== "running" && t.steps.length === 0 && (
-        <Empty title="A specialist is on it">
+        <Empty title="An admin is on it">
           This issue needs a person to look at it. You'll get a reply in the conversation and by email.
         </Empty>
       )}
       {t.steps.length > 0 && (
         <>
           <div className="step-intro">
-            <strong>{t.steps[0]?.origin === "agent" ? "Steps from your specialist" : "Suggested steps for your issue"}</strong>
+            <strong>{t.steps[0]?.origin !== "ai" ? "Steps from your admin" : "Suggested steps for your issue"}</strong>
             <p className="caption">
               Try each step, then tell us whether it worked. {t.steps[0]?.origin === "ai" &&
                 "The sources under each suggestion show what supports it. "}
@@ -451,8 +451,8 @@ function StepsTab({ ticket: t, busy, open, anyWorked, onStatus, onChat, onSource
             </div>
           )}
           {open && t.status === "self_service" && (
-            <button className="btn btn-text" style={{ alignSelf: "flex-start" }} disabled={busy} onClick={onSpecialist}>
-              Rather talk to a specialist?
+            <button className="btn btn-text" style={{ alignSelf: "flex-start" }} disabled={busy} onClick={onAdmin}>
+              Rather talk to an admin?
             </button>
           )}
         </>
@@ -500,7 +500,7 @@ function StepRow({ step, disabled, chatCount, onStatus, onChat, onSource }) {
           </div>
         )}
         {step.origin === "ai" && evidence.length === 0 && (
-          <p className="caption">Source details are unavailable for this step. Ask a specialist if you need more context.</p>
+          <p className="caption">Source details are unavailable for this step. Ask an admin if you need more context.</p>
         )}
         <div className="row" style={{ marginTop: 4 }}>
           <div className="seg" role="group" aria-label="Did this step work?">
@@ -644,7 +644,7 @@ function ReopenDialog({ busy, onCancel, onSubmit }) {
         </div>
         <div className="drawer-body stack">
           <p className="muted body-sm">
-            Tell us what happened when you tried the fix. Your ticket goes straight back to a specialist with everything
+            Tell us what happened when you tried the fix. Your ticket goes straight back to an admin with everything
             you've already tried.
           </p>
           <textarea
@@ -700,7 +700,7 @@ function describeEvent(kind, detail) {
     case "step_feedback":
       return `Step ${d.step}: ${d.status === "worked" ? "worked" : d.status === "did_not_work" ? "didn't work" : "reset"}`;
     case "assigned":
-      return "A specialist picked up your ticket";
+      return "An admin picked up your ticket";
     case "info_requested":
       return "Support asked for more information";
     case "solution_proposed":
@@ -710,7 +710,7 @@ function describeEvent(kind, detail) {
     case "resolved":
       return "Resolved";
     case "escalated":
-      return "Sent to a specialist";
+      return "Sent to an admin";
     case "incident_linked":
       return "Linked to a known area issue";
     default:

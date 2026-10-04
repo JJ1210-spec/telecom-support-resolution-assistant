@@ -3,7 +3,7 @@
 Passwords: salted scrypt. Sessions: random token in an HttpOnly SameSite=Lax cookie, stored hashed.
 Mutations require the per-session CSRF token in `X-CSRF-Token`. Five failed logins lock an account for
 ten minutes; login/register/ticket creation are also rate limited per IP via the shared KV store.
-Roles: customer < agent < admin. Public registration can only create customers.
+Roles: customer and admin. Public registration can only create customers.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from ..db import Database, sessions, users, utc_now
 SESSION_SECONDS = 12 * 60 * 60
 COOKIE = "rd_session"
 EMAIL = re.compile(r"^[\w.+-]+@[\w-]+(\.[\w-]+)*\.[A-Za-z]{2,}$")
-ROLE_RANK = {"customer": 0, "agent": 1, "admin": 2}
+ROLES = {"customer", "admin"}
 
 
 def password_hash(password: str) -> str:
@@ -48,7 +48,7 @@ class Accounts:
     def create(self, email: str, password: str, role: str = "customer", name: str = "",
                region: str | None = None) -> dict:
         email = email.strip().casefold()
-        if role not in ROLE_RANK:
+        if role not in ROLES:
             raise ValueError("Invalid role")
         if not 10 <= len(password) <= 128:
             raise ValueError("Use a password of 10-128 characters")
@@ -65,7 +65,7 @@ class Accounts:
     def authenticate(self, email: str, password: str) -> dict | None:
         with self.db.tx() as con:
             row = con.execute(sa.select(users).where(users.c.email == email.strip().casefold())).first()
-            if not row or row.locked_until > int(time.time()):
+            if not row or row.role not in ROLES or row.locked_until > int(time.time()):
                 return None
             if not password_matches(password, row.password_hash):
                 failures = row.failed_attempts + 1
@@ -92,7 +92,7 @@ class Accounts:
                                         sessions.c.csrf_token).join(sessions, sessions.c.user_id == users.c.id)
                               .where(sessions.c.token_hash == hashlib.sha256(token.encode()).hexdigest(),
                                      sessions.c.expires_at > int(time.time()))).first()
-        return dict(row._mapping) if row else None
+        return dict(row._mapping) if row and row.role in ROLES else None
 
     def revoke(self, token: str) -> None:
         with self.db.tx() as con:
@@ -100,6 +100,7 @@ class Accounts:
 
     def list(self, role: str | None = None) -> list[dict]:
         query = sa.select(users.c.id, users.c.email, users.c.name, users.c.role, users.c.region, users.c.created_at)
+        query = query.where(users.c.role.in_(ROLES))
         if role:
             query = query.where(users.c.role == role)
         with self.db.read() as con:
@@ -116,7 +117,7 @@ def current_user(request: Request) -> dict:
 def require(role: str, write: bool = False):
     def dependency(request: Request, user: dict = Depends(current_user),
                    x_csrf_token: str | None = Header(default=None)) -> dict:
-        if ROLE_RANK[user["role"]] < ROLE_RANK[role] or (role == "customer" and user["role"] != "customer"):
+        if user["role"] != role:
             raise HTTPException(403, f"{role.title()} role required")
         if write and (not x_csrf_token or not hmac.compare_digest(user["csrf_token"], x_csrf_token)):
             raise HTTPException(403, "CSRF token missing or invalid")
@@ -127,7 +128,5 @@ def require(role: str, write: bool = False):
 
 customer_read = require("customer")
 customer_write = require("customer", write=True)
-agent_read = require("agent")
-agent_write = require("agent", write=True)
 admin_read = require("admin")
 admin_write = require("admin", write=True)

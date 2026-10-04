@@ -6,7 +6,7 @@ Created a deterministic, original synthetic data generator and five JSONL output
 
 ## Why these choices were made
 
-The referenced Tobi-Bueck dataset supplies useful ticket fields and complaint style, but its agent `answer` is not a verified resolution and many rows are not telecom cases. This phase uses its field structure as inspiration and writes new telecom records. Resolved and unresolved cases are separate files to make the initial retrieval boundary obvious. They still use one canonical ticket schema so a real ticket can move from unresolved to resolved without changing identity or losing its history.
+The referenced Tobi-Bueck dataset supplies useful ticket fields and complaint style, but its admin `answer` is not a verified resolution and many rows are not telecom cases. This phase uses its field structure as inspiration and writes new telecom records. Resolved and unresolved cases are separate files to make the initial retrieval boundary obvious. They still use one canonical ticket schema so a real ticket can move from unresolved to resolved without changing identity or losing its history.
 
 JSONL preserves arrays of resolution steps and KB references without packing them into CSV cells. A separate evaluation file prevents the demo from indexing its test complaints. Status and closure are synthetic labels for controlled testing; they do not imply observed real-world outcomes.
 

@@ -3,7 +3,7 @@
   check-keys          ping every configured provider and show quota meters
   seed [--demo]       load taxonomy, KB and the synthetic corpus; --demo adds demo users and tickets
   updates             replay versioned update events (ticket resolutions, KB edit + deprecation)
-  create-user         create an agent/admin (password prompted)
+  create-user         create an admin or customer (password prompted)
   eval [--limit N]    run the evaluation suite and write reports/
   drift               compute drift metrics + alerts
   discover            cluster the discovery pool into taxonomy proposals
@@ -62,7 +62,6 @@ async def seed(settings: Settings, demo: bool, demo_tickets: int) -> None:
     password = os.getenv("DEMO_PASSWORD") or secrets.token_urlsafe(9)
     created = []
     for email, role, name, region in [("admin@resolvedesk.dev", "admin", "Asha Admin", None),
-                                      ("agent@resolvedesk.dev", "agent", "Arjun Agent", None),
                                       ("customer@resolvedesk.dev", "customer", "Priya Customer", "Koramangala")]:
         try:
             accounts.create(email, password, role, name, region)
@@ -148,7 +147,7 @@ def main() -> None:
     sub.add_parser("updates")
     p = sub.add_parser("create-user")
     p.add_argument("--email", required=True)
-    p.add_argument("--role", choices=["agent", "admin", "customer"], default="agent")
+    p.add_argument("--role", choices=["admin", "customer"], default="admin")
     p.add_argument("--name", default="")
     p = sub.add_parser("eval")
     p.add_argument("--limit", type=int)

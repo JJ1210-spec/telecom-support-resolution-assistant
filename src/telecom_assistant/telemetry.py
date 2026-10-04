@@ -1,7 +1,7 @@
 """Observability: structured JSON logs, an in-process metrics registry and Langfuse LLM traces.
 
 * `metrics` keeps counters and latency histograms in memory; `/metrics` exposes them in Prometheus text
-  format (scrapeable by Prometheus / Grafana Agent) and the admin Health page reads them as JSON.
+  format (scrapeable by Prometheus) and the admin Health page reads them as JSON.
 * LLM generations are batched to the Langfuse ingestion API in the background (never on the hot path).
 """
 

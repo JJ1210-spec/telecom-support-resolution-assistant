@@ -18,10 +18,10 @@ confirmed resolution to the knowledge base.
 
 ## What it does
 
-| | Customer | Support agent / admin |
+| | Customer | Admin |
 |---|---|---|
 | **Intake** | Swiggy-style chips (area → issue → "something else"), then 0-3 adaptive questions picked by **expected information gain**, with a live "what we think it is" panel | Sees every answer and how many bits of uncertainty it removed |
-| **Routing** | Simple and recurring issues get steps right away. P2 and borderline issues get safe steps **and** a specialist. P1, sensitive or unclear issues go straight to a human. | Each decision lists its reasons: recurrence, confidence, severity drivers, safety blockers |
+| **Routing** | Simple and recurring issues get steps right away. P2 and borderline issues get safe steps **and** an admin. P1, sensitive or unclear issues go straight to a human. | Each decision lists its reasons: recurrence, confidence, severity drivers, safety blockers |
 | **Steps** | Checklist with **Tried - worked / Tried - didn't work** and a **side chat for each step**. All steps failing escalates automatically. | Sees each step's outcome, notes and step chat. Outcomes re-weight retrieval and feed solution-drift alerts. |
 | **Conversation** | Thread with **quick-reply choices** when support asks a question | Ask for info with options, reply, add internal notes, propose a fix, resolve with a note |
 | **Lifecycle** | Ticket stays live; "still not working" **reopens the same ticket**; rate the support | Queue sorted by severity and SLA; claim; **copilot** shows similar incidents, root causes, next actions (excluding what failed), questions and a reply draft |
@@ -47,7 +47,7 @@ cd frontend && npm ci && npm run build && cd ..
 .venv/Scripts/python -m uvicorn telecom_assistant.main:app --port 8000
 ```
 
-Open `http://localhost:8000`. The demo accounts are `customer@`, `agent@` and `admin@resolvedesk.dev`. Their
+Open `http://localhost:8000`. The demo accounts are `customer@resolvedesk.dev` and `admin@resolvedesk.dev`. Their
 password is `DEMO_PASSWORD` in `.env`, or whatever `seed --demo` prints. API docs are at `/docs`.
 
 For UI development, run `npm run dev` in `frontend/` (port 5173, proxied to the API on 8000). Use
@@ -68,7 +68,7 @@ or Groq). Without one, tickets still save and go to a human.
 | AI suggestions for escalated tickets | `ai/assistants.py::Copilot`, `tickets/desk.py::refresh_copilot` |
 | Questions (MCQ / free text) to narrow the problem | `ai/clarify.py`, `resources/questions.json` |
 | Step checkboxes + per-step side chat | `tickets/desk.py::step_feedback/step_chat`, `frontend/src/pages/customer/Tickets.jsx` |
-| Customer ↔ agent messages, choices for unclear complaints | `desk.py::agent_message/customer_message`, `NewTicket.jsx`, `Chat.jsx` |
+| Customer ↔ admin messages, choices for unclear complaints | `desk.py::admin_message/customer_message`, `NewTicket.jsx`, `Chat.jsx` |
 | Data drift | `insights/drift.py`, `insights/discovery.py`, `knowledge/taxonomy.py`, `cli.py reindex` |
 
 ## Evaluation and system health
@@ -106,7 +106,7 @@ critical outages are always caught, but medium vs low priority (P2/P3) is often 
 
 At runtime:
 
-- `/metrics` exposes Prometheus metrics (scrapeable by Prometheus or Grafana Agent);
+- `/metrics` exposes Prometheus metrics;
 - `/ready` checks the database, vector store and cache;
 - LLM generations are traced to Langfuse;
 - the admin **Health** page shows provider quota meters, circuit breakers, latency, the outbox/DLQ and the email
@@ -115,7 +115,7 @@ At runtime:
 ## Tests
 
 ```bash
-.venv/Scripts/python -m pytest -q          # 27 tests, no network: fake LLM, hash embedder, local index, SQLite
+.venv/Scripts/python -m pytest -q          # 29 tests, no network: fake LLM, hash embedder, local index, SQLite
 .venv/Scripts/python -m ruff check src tests
 cd frontend && npm run build
 ```
@@ -136,7 +136,7 @@ src/telecom_assistant/
   insights/       drift, discovery, incident radar, KPIs
   resources/      taxonomy seed, question bank, customer self-help KB sections
   evaluation.py   eval harness + markdown report
-frontend/         React + Vite, JavaScript/JSX (customer portal and agent/admin console)
+frontend/         React + Vite, JavaScript/JSX (customer portal and admin console)
 data/synthetic/v1 synthetic corpus, held-out eval cases, update events
 docs/             architecture, phase records, issues log
 ```

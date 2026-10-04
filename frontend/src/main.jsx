@@ -11,8 +11,8 @@ import Landing from "./pages/Landing";
 import { Login, Register } from "./pages/Auth";
 import NewTicket from "./pages/customer/NewTicket";
 import { CustomerInbox, InboxHome, TicketDetail } from "./pages/customer/Tickets";
-import AgentTicket from "./pages/agent/AgentTicket";
-import { IncidentsPage, OverviewPage, PlaygroundPage, QueuePage } from "./pages/agent/Console";
+import AdminTicket from "./pages/admin/AdminTicket";
+import { IncidentsPage, OverviewPage, PlaygroundPage, QueuePage } from "./pages/admin/Console";
 import { DriftPage, HealthPage, KnowledgePage, TaxonomyPage } from "./pages/admin/Admin";
 function Guard({ roles, children }) {
   const { user, loading } = useAuth();
@@ -32,7 +32,7 @@ function GuestOnly({ children }) {
   if (loading) return null;
   return user ? <Navigate to={homeFor(user)} replace /> : <>{children}</>;
 }
-const STAFF = ["agent", "admin"];
+const ADMIN = ["admin"];
 function Root() {
   const location = useLocation();
   return (
@@ -79,14 +79,14 @@ function App() {
       <Route
         path="/console"
         element={
-          <Guard roles={STAFF}>
+          <Guard roles={ADMIN}>
             <ConsoleLayout />
           </Guard>
         }
       >
         <Route index element={<OverviewPage />} />
         <Route path="queue" element={<QueuePage />} />
-        <Route path="tickets/:id" element={<AgentTicket />} />
+        <Route path="tickets/:id" element={<AdminTicket />} />
         <Route path="incidents" element={<IncidentsPage />} />
         <Route path="playground" element={<PlaygroundPage />} />
         <Route path="knowledge" element={<KnowledgePage />} />

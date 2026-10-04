@@ -93,10 +93,10 @@ export function KnowledgePage() {
                       <li key={s}>{s}</li>
                     ))}
                   </ol>
-                  {!a.self_help.length && <div className="caption">None — agent-only article</div>}
+                  {!a.self_help.length && <div className="caption">None — admin-only article</div>}
                 </div>
                 <div>
-                  <div className="caption">Agent checks</div>
+                  <div className="caption">Admin checks</div>
                   <ol className="body-sm" style={{ margin: "4px 0 0", paddingLeft: 18 }}>
                     {a.checks.map((s) => (
                       <li key={s}>{s}</li>
@@ -648,7 +648,7 @@ export function HealthPage() {
                 {emails.data?.emails.map((e) => (
                   <tr key={e.event_id} className="clickable" onClick={() => setPreview(e)}>
                     <td>
-                      <div style={{ fontWeight: 500 }}>{e.template.replace(/_/g, " ")}</div>
+                      <div style={{ fontWeight: 500 }}>{e.template.endsWith("_message") ? "Support reply" : e.template.replace(/_/g, " ")}</div>
                       <div className="mono caption">{e.ticket_id}</div>
                     </td>
                     <td className="caption">{e.to_address}</td>

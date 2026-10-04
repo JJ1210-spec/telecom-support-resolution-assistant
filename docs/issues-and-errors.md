@@ -129,7 +129,7 @@ This log records issues found during the project. Keep the original symptom, att
 ## P6-003 Gemini drafts failed validation or stopped with RECITATION — resolved
 
 - **Phase:** 6, hosted APIs.
-- **Observed:** About half of the draft calls to `gemini-3.5-flash-lite` fell back to Groq, adding 5-15 s. The failures were (a) `agent_steps` returned as plain strings, (b) truncated JSON, and (c) `finishReason: RECITATION` when steps copied KB text.
+- **Observed:** About half of the draft calls to `gemini-3.5-flash-lite` fell back to Groq, adding 5-15 s. The failures were (a) `admin_steps` returned as plain strings, (b) truncated JSON, and (c) `finishReason: RECITATION` when steps copied KB text.
 - **Methods tried:** Passed the Pydantic schema through as `responseJsonSchema` (constrained decoding) and added a "rephrase, don't copy" instruction (`draft@3.1`). That fixed (a), but (b) and (c) still occurred.
 - **Resolution:** Kept constrained decoding for Gemini. Content-filter stops now raise a provider error, so the gateway fails over at once instead of retrying the same model. By measurement, the draft chain is now `groq:openai/gpt-oss-120b` first with Gemini as fallback, and triage stays Gemini-first. This is a configuration change only.
 - **Verification:** Four consecutive live analyses ran triage and draft on the primary provider: triage 1.3-1.5 s, draft 1.5-2.8 s.
@@ -139,7 +139,7 @@ This log records issues found during the project. Keep the original symptom, att
 - **Phase:** 6, grounding.
 - **Observed:** A complaint triaged as *weak Wi-Fi in some rooms* received steps from the *intermittent drop* article, because the Wi-Fi article's sections ranked below the drop article for that wording.
 - **Resolution:** Parent-document expansion now always loads the published article(s) for the *triaged intent* first, followed by the best retrieved articles (at most 2).
-- **Verification:** Re-running the same complaint on the hosted stack gave customer steps citing `KB-BB-WIFI#h1-h3` and agent steps citing `KB-BB-WIFI#c1-c3`. The agent steps also cited `LRN-TCK-2610-39B122`, the case learned from the earlier live ticket, which shows the learning loop end to end.
+- **Verification:** Re-running the same complaint on the hosted stack gave customer steps citing `KB-BB-WIFI#h1-h3` and admin steps citing `KB-BB-WIFI#c1-c3`. The admin steps also cited `LRN-TCK-2610-39B122`, the case learned from the earlier live ticket, which shows the learning loop end to end.
 
 ## P6-005 Rate-limit storm degraded 70% of the first live eval — resolved
 

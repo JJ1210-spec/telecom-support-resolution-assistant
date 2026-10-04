@@ -1,4 +1,4 @@
-"""Operational KPIs for the agent/admin overview: deflection, resolution time, reopen rate, CSAT, step success."""
+"""Operational KPIs for the admin overview: deflection, resolution time, reopen rate, CSAT, step success."""
 
 from __future__ import annotations
 

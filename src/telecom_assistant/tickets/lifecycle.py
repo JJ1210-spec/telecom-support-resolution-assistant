@@ -1,4 +1,4 @@
-"""Ticket state machine. A ticket stays live until the customer confirms the fix (or an agent resolves
+"""Ticket state machine. A ticket stays live until the customer confirms the fix (or an admin resolves
 with a written note); any "it didn't work" moves the *same* ticket back to a human with its history."""
 
 from __future__ import annotations
@@ -9,7 +9,7 @@ STATUSES = {
     "analyzing": "Analyzing your request",
     "self_service": "Solution ready - try these steps",
     "escalated": "With our support team",
-    "in_progress": "Specialist working on it",
+    "in_progress": "Admin working on it",
     "awaiting_customer": "Waiting for your reply",
     "solution_proposed": "Solution proposed - please confirm",
     "resolved": "Resolved",

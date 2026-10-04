@@ -122,7 +122,7 @@ export function ConsoleLayout() {
   const location = useLocation();
   const flush = location.pathname.startsWith("/console/tickets/");
   const [tick, setTick] = useState(0);
-  const counts = useResource(() => api.get("/v1/agent/queue?scope=human"), [tick]);
+  const counts = useResource(() => api.get("/v1/admin/queue?scope=human"), [tick]);
   useLiveEvents((event) => {
     if (["created", "analyzed", "escalated", "status", "reopened"].includes(event.kind)) setTick((t) => t + 1);
   });

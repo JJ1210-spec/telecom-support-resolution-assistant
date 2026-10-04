@@ -54,11 +54,11 @@
 }
 .tab.active .count { background: var(--ink); color: #fff; }
 
-/* console: fixed sidebar, scrolling main; the agent ticket workspace fills the viewport */
+/* console: fixed sidebar, scrolling main; the admin ticket workspace fills the viewport */
 .console { height: 100vh; height: 100dvh; min-height: 0; overflow: hidden; }
 .console-main { height: 100vh; height: 100dvh; overflow-y: auto; }
 .console-main.flush { padding: 0; overflow: hidden; display: flex; flex-direction: column; }
-.agent-body {
+.admin-body {
   flex: 1; min-height: 0; display: grid;
   grid-template-columns: minmax(280px, 0.9fr) minmax(0, 1.4fr) minmax(320px, 1fr);
 }
@@ -76,20 +76,20 @@
 
 /* responsive: below tablet the app shell becomes a normal scrolling page */
 @media (max-width: 1100px) {
-  .agent-body { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-  .agent-body > .panel.context { display: none; }
+  .admin-body { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .admin-body > .panel.context { display: none; }
   .wizard { grid-template-columns: 1fr; }
   .wizard-side { display: none; }
 }
 @media (max-width: 900px) {
   .app, .console, .console-main { height: auto; overflow: visible; }
-  .app-body, .split, .ws-body, .agent-body, .console-main.flush { display: block; }
+  .app-body, .split, .ws-body, .admin-body, .console-main.flush { display: block; }
   .rail { border-right: 0; }
   .split.has-selection .rail { display: none; }
   .split:not(.has-selection) .workspace { display: none; }
   .rail-list, .panel-body, .ws-scroll, .wizard-content { overflow: visible; }
   .panel + .panel { border-left: 0; border-top: 1px solid var(--hairline); }
-  .agent-body > .panel.context { display: flex; }
+  .admin-body > .panel.context { display: flex; }
   .ws-head, .ws-pad, .wizard-content { padding-inline: 16px; }
   .wizard-foot { position: sticky; bottom: 0; padding-inline: 16px; }
 }

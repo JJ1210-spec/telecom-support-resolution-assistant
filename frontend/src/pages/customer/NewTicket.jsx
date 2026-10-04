@@ -322,7 +322,7 @@ export default function NewTicket() {
             <Icon name="bolt" size={16} /> Familiar issues get instant, step-by-step fixes.
           </div>
           <div className="row nowrap">
-            <Icon name="user" size={16} /> Anything complex goes to a specialist.
+            <Icon name="user" size={16} /> Anything complex goes to an admin.
           </div>
           <div className="row nowrap">
             <Icon name="mail" size={16} /> Email confirmation in seconds.

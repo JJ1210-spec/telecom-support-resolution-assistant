@@ -17,9 +17,9 @@ import {
   useToast,
 } from "../../components/ui";
 import { useLiveEvents, useResource } from "../../hooks/useLive";
-export default function AgentTicket() {
+export default function AdminTicket() {
   const { id = "" } = useParams();
-  const res = useResource(() => api.get(`/v1/agent/tickets/${id}`), [id]);
+  const res = useResource(() => api.get(`/v1/admin/tickets/${id}`), [id]);
   const [busy, setBusy] = useState(false);
   const [toast, showToast] = useToast();
   const [draft, setDraft] = useState("");
@@ -54,7 +54,7 @@ export default function AgentTicket() {
   const triage = t.triage;
   const decision = t.decision;
   const customerSteps = t.steps.filter((s) => s.customer_visible);
-  const agentSteps = t.steps.filter((s) => !s.customer_visible);
+  const adminSteps = t.steps.filter((s) => !s.customer_visible);
   const stepChats = (stepId) => t.messages.filter((m) => m.step_id === stepId);
   const general = t.messages.filter((m) => !m.step_id);
   const open = !["resolved", "closed"].includes(t.status);
@@ -62,7 +62,7 @@ export default function AgentTicket() {
   const sendMessage = (requestInfo, internal = false) =>
     act(
       async () => {
-        const result = await api.post(`/v1/agent/tickets/${t.id}/messages`, {
+        const result = await api.post(`/v1/admin/tickets/${t.id}/messages`, {
           body: draft,
           options: requestInfo ? options : [],
           request_info: requestInfo,
@@ -90,7 +90,7 @@ export default function AgentTicket() {
               </Link>
               <span className="mono">{t.id}</span>
               {t.trace_id && (
-                <a href={`/v1/agent/traces/${t.trace_id}`} target="_blank" rel="noreferrer" className="mono">
+                <a href={`/v1/admin/traces/${t.trace_id}`} target="_blank" rel="noreferrer" className="mono">
                   trace
                 </a>
               )}
@@ -118,11 +118,11 @@ export default function AgentTicket() {
             <StatusBadge status={t.status} label={t.status_label} />
             <RouteBadge route={t.route} />
             <SeverityBadge level={t.severity} />
-            {!t.assignee_id && open && (
+            {!t.assignee && open && (
               <button
                 className="btn btn-primary btn-sm"
                 disabled={busy}
-                onClick={() => act(() => api.post(`/v1/agent/tickets/${t.id}/claim`), "Assigned to you")}
+                onClick={() => act(() => api.post(`/v1/admin/tickets/${t.id}/claim`), "Assigned to you")}
               >
                 Claim ticket
               </button>
@@ -137,7 +137,7 @@ export default function AgentTicket() {
         </div>
       )}
 
-      <div className="agent-body">
+      <div className="admin-body">
         {/* ---------------- context ---------------- */}
         <section className="panel context soft">
           <div className="panel-head">
@@ -326,7 +326,7 @@ export default function AgentTicket() {
             <>
               <div className="panel-body">
                 {general.length ? (
-                  <Thread messages={general} viewer="agent" />
+                  <Thread messages={general} viewer="admin" />
                 ) : (
                   <p className="caption">No messages yet.</p>
                 )}
@@ -397,18 +397,18 @@ export default function AgentTicket() {
                         Step chat ({stepChats(s.id).length})
                       </summary>
                       <div style={{ marginTop: 8 }}>
-                        <Thread messages={stepChats(s.id)} viewer="agent" />
+                        <Thread messages={stepChats(s.id)} viewer="admin" />
                       </div>
                     </details>
                   )}
                 </div>
               ))}
-              {agentSteps.length > 0 && (
+              {adminSteps.length > 0 && (
                 <>
                   <div className="eyebrow" style={{ marginTop: 8 }}>
-                    AI-suggested agent checks
+                    AI-suggested admin checks
                   </div>
-                  {agentSteps.map((s) => (
+                  {adminSteps.map((s) => (
                     <div key={s.id} className="row-between body-sm" style={{ alignItems: "flex-start" }}>
                       <span className="grow">
                         {s.text}
@@ -462,7 +462,7 @@ export default function AgentTicket() {
                 <button className="btn btn-xs btn-outline" onClick={() => setPlan([...plan, ""])}>
                   <Icon name="plus" size={12} /> Add step
                 </button>
-                <span className="caption">Tip: use “+ plan” on Copilot actions or agent checks.</span>
+                <span className="caption">Tip: use “+ plan” on Copilot actions or admin checks.</span>
               </div>
               <textarea
                 className="textarea"
@@ -477,7 +477,7 @@ export default function AgentTicket() {
                 disabled={busy || !plan.some((p) => p.trim())}
                 onClick={() =>
                   act(async () => {
-                    const r = await api.post(`/v1/agent/tickets/${t.id}/propose`, {
+                    const r = await api.post(`/v1/admin/tickets/${t.id}/propose`, {
                       steps: plan.filter((p) => p.trim()),
                       message: draft,
                     });
@@ -505,7 +505,7 @@ export default function AgentTicket() {
                 disabled={busy || resolveNote.trim().length < 3}
                 onClick={() =>
                   act(
-                    () => api.post(`/v1/agent/tickets/${t.id}/resolve`, { note: resolveNote }),
+                    () => api.post(`/v1/admin/tickets/${t.id}/resolve`, { note: resolveNote }),
                     "Resolved — summary will be added to the knowledge base",
                   )
                 }
@@ -550,7 +550,7 @@ export default function AgentTicket() {
           onRefresh={async () => {
             setCopilotBusy(true);
             try {
-              const brief = await api.post(`/v1/agent/tickets/${t.id}/copilot`);
+              const brief = await api.post(`/v1/admin/tickets/${t.id}/copilot`);
               res.setData({ ...t, copilot: brief });
             } catch (err) {
               showToast(err instanceof Error ? err.message : "Copilot failed");

@@ -62,10 +62,10 @@ def render(template: str, ctx: dict) -> tuple[str, str, str]:
                           f'many times. We\'ve put {ctx.get("steps", 0)} quick steps in your ticket. Tick each one as '
                           'you try it and tell us whether it worked.</p>')
         elif ctx.get("route") == "assisted":
-            blocks.append('<p style="font-size:15px;line-height:1.5">A support specialist is reviewing your ticket. '
+            blocks.append('<p style="font-size:15px;line-height:1.5">A support admin is reviewing your ticket. '
                           'Meanwhile, a few safe checks are waiting in your ticket.</p>')
         else:
-            blocks.append('<p style="font-size:15px;line-height:1.5">A support specialist will review your ticket '
+            blocks.append('<p style="font-size:15px;line-height:1.5">A support admin will review your ticket '
                           'and reply in the portal.</p>')
         text = f"We've received ticket {ticket}. Track it here: {url}"
         return subject, _layout("We've got your request", intro, blocks, ("View your ticket", url), footer), text
@@ -75,9 +75,9 @@ def render(template: str, ctx: dict) -> tuple[str, str, str]:
                  "is linked to it. You don't need to do anything else - we'll update you as soon as it's fixed.")
         blocks = [_kv([("Ticket", ticket), ("Incident", ctx.get("incident_id", "")), ("Area", ctx.get("region", ""))])]
         return subject, _layout("Known issue in your area", intro, blocks, ("View status", url), footer), intro
-    if template == "agent_message":
+    if template == "admin_message" or (template.endswith("_message") and ctx.get("message")):
         subject = f"[{ticket}] New reply from support"
-        intro = f"Hi {escape(name)}, a support specialist replied to your ticket."
+        intro = f"Hi {escape(name)}, a support admin replied to your ticket."
         quote = (f'<blockquote style="margin:12px 0;padding:12px 16px;background:{SOFT};border-radius:12px;'
                  f'font-size:15px;line-height:1.5">{escape(ctx.get("message", ""))}</blockquote>')
         blocks = [quote]
@@ -88,14 +88,14 @@ def render(template: str, ctx: dict) -> tuple[str, str, str]:
             f"{ctx.get('message', '')}\n\nReply: {url}"
     if template == "solution_proposed":
         subject = f"[{ticket}] A solution is ready - please confirm"
-        intro = (f"Hi {escape(name)}, our specialist has proposed a fix. Please try it and tell us whether it worked "
+        intro = (f"Hi {escape(name)}, our admin has proposed a fix. Please try it and tell us whether it worked "
                  "- if it doesn't, the same ticket goes straight back to the team.")
         blocks = [_list(ctx.get("steps", []))] if ctx.get("steps") else []
         return subject, _layout("Your solution is ready", intro, blocks, ("Confirm the fix", url), footer), \
             f"Solution proposed for {ticket}. Confirm: {url}"
     if template == "reopened":
         subject = f"[{ticket}] Reopened - we're on it"
-        intro = (f"Hi {escape(name)}, sorry the last fix didn't work. Your ticket is back with a specialist, with "
+        intro = (f"Hi {escape(name)}, sorry the last fix didn't work. Your ticket is back with an admin, with "
                  "everything you've already tried, so you won't have to repeat yourself.")
         return subject, _layout("Your ticket is back in progress", intro, [facts], ("View ticket", url), footer), intro
     if template == "resolved":

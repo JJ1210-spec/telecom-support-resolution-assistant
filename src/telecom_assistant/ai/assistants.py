@@ -1,4 +1,4 @@
-"""LLM helpers around the ticket lifecycle: agent copilot, resolution summarizer and per-step chat.
+"""LLM helpers around the ticket lifecycle: admin copilot, resolution summarizer and per-step chat.
 
 All three validate structured output, re-check citations against the evidence actually supplied,
 and degrade to a deterministic answer when every provider is down.
@@ -31,7 +31,7 @@ class RootCause(BaseModel):
 
 class NextAction(BaseModel):
     text: str
-    owner: Literal["agent", "customer", "field"] = "agent"
+    owner: Literal["admin", "customer", "field"] = "admin"
     citations: list[str] = Field(default_factory=list)
 
 
@@ -126,8 +126,8 @@ class Copilot:
         failed = {s["text"] for s in timeline.get("steps", []) if s.get("status") == "did_not_work"}
         actions = []
         for s in sources:
-            if s["kind"] == "kb" and s.get("audience") == "agent" and s["text"] not in failed:
-                actions.append({"text": s["text"].split(":", 1)[-1].strip(), "owner": "agent", "citations": [s["id"]]})
+            if s["kind"] == "kb" and s.get("audience") == "admin" and s["text"] not in failed:
+                actions.append({"text": s["text"].split(":", 1)[-1].strip(), "owner": "admin", "citations": [s["id"]]})
         return {"summary": "LLM copilot unavailable - showing the closest KB checks and incidents.",
                 "likely_root_causes": [{"text": s["root_cause"], "likelihood": "medium", "citations": [s["id"]]}
                                        for s in sources if s["kind"] == "ticket" and s.get("root_cause")][:3],
@@ -147,7 +147,7 @@ class Summarizer:
             "title": (triage.get("intent_label") or ticket.get("subject") or "Resolved support case")[:200],
             "problem": ticket.get("complaint_redacted", "")[:600],
             "root_cause": (ticket.get("resolution_note") or "See resolution steps")[:400],
-            "resolution_steps": worked or [ticket.get("resolution_note") or "Resolved by support agent"],
+            "resolution_steps": worked or [ticket.get("resolution_note") or "Resolved by support admin"],
             "failed_attempts": failed, "customer_self_help": [], "escalation_criteria": "", "tags": [],
             "prompt_version": SUMMARY_VERSION,
         }
@@ -170,7 +170,7 @@ class StepChat:
     async def reply(self, step: dict, source_text: str, history: list[dict], question: str, language: str,
                     trace_id: str | None = None) -> dict:
         if self.llm is None:
-            return {"reply": "Thanks - a support agent will look at this step and reply here.", "needs_human": True,
+            return {"reply": "Thanks - a support admin will look at this step and reply here.", "needs_human": True,
                     "degraded": True}
         user = json.dumps({"step": step["text"], "why": step.get("detail"), "source": source_text[:1500],
                            "language": language,
@@ -180,9 +180,9 @@ class StepChat:
             result = await self.llm.json("draft", STEP_CHAT_SYSTEM, user, StepChatOut, max_tokens=400,
                                          temperature=0.2, trace_id=trace_id, name="step_chat")
         except LLMUnavailable:
-            return {"reply": "Thanks - a support agent will look at this step and reply here.", "needs_human": True,
+            return {"reply": "Thanks - a support admin will look at this step and reply here.", "needs_human": True,
                     "degraded": True}
         data = result.data
         if UNSUPPORTED_COMMITMENT.search(data["reply"]):
-            data = {"reply": "A support agent will confirm the details for you here shortly.", "needs_human": True}
+            data = {"reply": "A support admin will confirm the details for you here shortly.", "needs_human": True}
         return {**data, "prompt_version": STEP_CHAT_VERSION, "model": result.model_id, "degraded": False}

@@ -11,12 +11,12 @@ const STEPS = [
     body: "Two or three quick taps, each chosen to rule out the most possibilities. No irrelevant questions.",
   },
   {
-    title: "Fix it now — or a specialist",
+    title: "Fix it now — or an admin",
     body: "Familiar issues get grounded step-by-step fixes. Outages, billing disputes and anything unusual go to a person.",
   },
   {
     title: "Open until it's solved",
-    body: "Tick what worked. If it didn't, reopen the same ticket — your specialist sees everything you tried.",
+    body: "Tick what worked. If it didn't, reopen the same ticket — your admin sees everything you tried.",
   },
 ];
 const FEATURES = [
@@ -54,11 +54,11 @@ const FEATURES = [
 const FAQ = [
   {
     q: "Will I always get an automated answer?",
-    a: "No. Simple, frequently solved issues get instant steps. Anything urgent (like an area outage), sensitive (billing disputes, SIM identity, number porting) or unclear goes straight to a human specialist.",
+    a: "No. Simple, frequently solved issues get instant steps. Anything urgent (like an area outage), sensitive (billing disputes, SIM identity, number porting) or unclear goes straight to a human admin.",
   },
   {
     q: "What happens if the suggested steps don't work?",
-    a: "Mark them “didn't work” or tap “Still not working”. The same ticket goes to a specialist with everything you've already tried, so you never repeat yourself.",
+    a: "Mark them “didn't work” or tap “Still not working”. The same ticket goes to an admin with everything you've already tried, so you never repeat yourself.",
   },
   {
     q: "Is my personal information safe?",
@@ -120,7 +120,7 @@ export default function Landing() {
             </h1>
             <p className="lead">
               Describe the problem in your own words. We'll narrow it down with a couple of taps, fix the familiar in
-              minutes, and bring in a specialist when it really needs one.
+              minutes, and bring in an admin when it really needs one.
             </p>
             <div className="row">
               <Link to={primary} className="btn btn-primary btn-lg">
@@ -174,7 +174,7 @@ export default function Landing() {
               </div>
             </div>
             <div className="hero-card">
-              <div className="hc-muted">Specialist reply</div>
+              <div className="hc-muted">Admin reply</div>
               <div className="hc-quote">“Does it drop on 5 GHz only?”</div>
               <div className="hc-options">
                 <span className="hc-option active">Only 5 GHz</span>
@@ -245,7 +245,7 @@ export default function Landing() {
               className="btn btn-outline-dark"
               style={{ marginTop: 28 }}
             >
-              Agent sign in
+              Admin sign in
             </Link>
           </div>
         </div>

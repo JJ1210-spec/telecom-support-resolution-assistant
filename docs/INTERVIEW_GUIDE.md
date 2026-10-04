@@ -22,7 +22,7 @@ The detailed design is in [architecture.md](architecture.md); this page is the v
 
 - Customers describe the same issue in many ways: "internet drops at night", "WiFi cuts out after 7pm",
   "line sync lost during peak hours". Keyword search misses these matches.
-- Agents waste time on repeat issues, answer quality varies, and customers repeat themselves at every handoff.
+- Admins waste time on repeat issues, answer quality varies, and customers repeat themselves at every handoff.
 - The goal is to **solve the easy cases instantly and safely, and make the hard cases faster for humans**,
   without the AI ever making things up or promising things it can't deliver.
 
@@ -59,7 +59,7 @@ flowchart LR
    - **Human:** P1, sensitive (billing, identity, porting), unclear, or a suspicious prompt.
 6. **Steps.** The customer ticks "worked / didn't work" on each step and can open a chat for any step. If every
    step fails, the ticket goes to a human automatically, along with everything that was tried.
-7. **Human loop.** The agent sees a copilot brief (similar past incidents, likely causes, next actions), can ask
+7. **Human loop.** The admin sees a copilot brief (similar past incidents, likely causes, next actions), can ask
    the customer a question with tap-to-answer choices, and proposes a fix. The customer confirms it or says
    "still not working", which reopens the **same** ticket.
 8. **Learning.** Once resolved, an LLM summarises the whole ticket, and the summary is immediately searchable as
@@ -97,12 +97,12 @@ prompt:
 
 - citations that weren't in the sources are deleted, and uncited steps are dropped;
 - unsupported promises (refunds, deadlines) are filtered out;
-- a step shown to the *customer* must cite a "customer self-help" section of the KB, so agent-only actions
+- a step shown to the *customer* must cite a "customer self-help" section of the KB, so admin-only actions
   like "reprovision the line" can never reach the customer.
 
 **Routing, `ai/resolver.py::route`.**
 Every decision is a list of plain-English reasons ("P1 severity always goes to a human", "Only 1 similar past
-case"). Agents see the reasons, and customers see a friendly version.
+case"). Admins see the reasons, and customers see a friendly version.
 
 **Ticket lifecycle, `tickets/lifecycle.py` and `tickets/desk.py`.**
 A small state machine: analyzing → self_service / escalated → in_progress → awaiting_customer →
@@ -133,7 +133,7 @@ It watches four things:
 
 **Incident radar, `insights/incidents.py`.**
 When 3 or more similar tickets arrive from the same area within 6 hours, they are grouped into one incident.
-Those customers are told "known issue in your area", and the agent resolves the incident once for everyone.
+Those customers are told "known issue in your area", and the admin resolves the incident once for everyone.
 
 **LLM gateway, `gateways/llm.py`.**
 Each job has an ordered list of models (e.g. Gemini, then Groq). If a model errors, returns invalid JSON or is
@@ -148,8 +148,8 @@ If every model is down, the ticket is still saved and goes to a human; nothing i
 |---|---|---|
 | Retrieval-grounded LLM (RAG), not fine-tuning | New fixes are usable as soon as they're indexed; every answer is traceable to a source | Fine-tuning: slow to update, can't cite |
 | Citations validated **in code** | Prompts can be ignored; code can't | Trusting the prompt |
-| Three routes, not "AI vs human" | Borderline cases still get safe help while a human looks | Binary routing wastes either customer or agent time |
-| Customer steps must cite self-help sections | The model can't reliably tell safe actions from agent-only ones; the KB can | Letting the LLM decide what's safe |
+| Three routes, not "AI vs human" | Borderline cases still get safe help while a human looks | Binary routing wastes either customer or admin time |
+| Customer steps must cite self-help sections | The model can't reliably tell safe actions from admin-only ones; the KB can | Letting the LLM decide what's safe |
 | Intake by information gain, no LLM | Deterministic, testable, explainable, free | LLM chat interview: slow, costly, unpredictable |
 | Postgres is the source of truth; vectors are derived | A lost vector index can be rebuilt from the database with cached embeddings | Treating the vector DB as the only copy |
 | Transactional outbox for email | No lost or phantom emails | Sending email inside the request |
@@ -272,7 +272,7 @@ added. It works without needing comparable scores from the two searches.
 
 **Q: How is privacy handled?**
 Phone numbers, emails, card numbers and account numbers are redacted before any AI call, log or trace. The raw
-text stays only in the ticket database, visible to the customer and agents.
+text stays only in the ticket database, visible to the customer and admins.
 
 **Q: How do you test something that uses an LLM?**
 Two levels:
@@ -324,5 +324,5 @@ Two levels:
 | LLM failover + rate limits | `src/telecom_assistant/gateways/llm.py` |
 | HTTP API | `src/telecom_assistant/api/app.py` |
 | Customer screens | `frontend/src/pages/customer/` |
-| Agent / admin screens | `frontend/src/pages/agent/`, `frontend/src/pages/admin/` |
+| Admin screens | `frontend/src/pages/admin/` |
 | Evaluation | `src/telecom_assistant/evaluation.py`, `reports/` |

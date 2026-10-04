@@ -6,7 +6,7 @@ Implemented a FastAPI assist service and a local web interface. The service read
 
 ## Why
 
-The assist service owns decisions shown to agents; the knowledge service owns data and retrieval. The model is used for text interpretation and drafting, while source eligibility, schema validation and citation-ID checks are enforced by code. The interface uses text-only DOM insertion so retrieved content is displayed as text.
+The assist service owns decisions shown to admins; the knowledge service owns data and retrieval. The model is used for text interpretation and drafting, while source eligibility, schema validation and citation-ID checks are enforced by code. The interface uses text-only DOM insertion so retrieved content is displayed as text.
 
 ## Verification
 

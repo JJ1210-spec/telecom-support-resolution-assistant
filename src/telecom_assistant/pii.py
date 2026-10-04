@@ -2,7 +2,7 @@
 
 Regex recognizers cover the identifiers that show up in telecom complaints (email, phone/MSISDN,
 account / IMEI / ICCID numbers, card numbers, Indian PAN/Aadhaar-style IDs, IP and MAC addresses).
-The raw complaint is stored only in the system-of-record ticket row, visible to the owner and agents.
+The raw complaint is stored only in the system-of-record ticket row, visible to the owner and admins.
 """
 
 from __future__ import annotations

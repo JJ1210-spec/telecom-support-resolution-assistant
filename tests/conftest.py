@@ -57,21 +57,21 @@ class FakeLLM:
                                "evidence": {"intent": complaint[:30]}}), {"input": 10, "output": 10}
         if kind == "draft":
             customer = re.findall(r'id="([^"]+)" type="kb" audience="customer"', user)
-            agent = re.findall(r'id="([^"]+)" type="(?:kb|ticket)" audience="agent"', user)
+            admin = re.findall(r'id="([^"]+)" type="(?:kb|ticket)" audience="admin"', user)
             return json.dumps({
-                "probable_root_cause": {"text": "Possible line or Wi-Fi issue", "citations": agent[:1]},
+                "probable_root_cause": {"text": "Possible line or Wi-Fi issue", "citations": admin[:1]},
                 "customer_steps": [{"text": f"Customer step {i + 1}", "detail": "why", "citations": [cid]}
                                    for i, cid in enumerate(customer[:2])] +
                                   [{"text": "Unsupported step", "citations": ["KB-FAKE#h9"]}],
-                "agent_steps": [{"text": "Agent check", "citations": agent[:1]},
-                                {"text": "Promise a refund within 2 days", "citations": agent[:1]}],
+                "admin_steps": [{"text": "Admin check", "citations": admin[:1]},
+                                {"text": "Promise a refund within 2 days", "citations": admin[:1]}],
                 "customer_message": "Sorry about this.", "escalate_if": ["persists"], "abstain": False,
                 "confidence": 0.8}), {"input": 10, "output": 10}
         if kind == "copilot":
             ids = re.findall(r'<source id="([^"]+)"', user)
             return json.dumps({"summary": "Customer tried steps.", "likely_root_causes": [
                 {"text": "Line fault", "likelihood": "high", "citations": ids[:1]}],
-                "next_actions": [{"text": "Run line test", "owner": "agent", "citations": ids[:1]}],
+                "next_actions": [{"text": "Run line test", "owner": "admin", "citations": ids[:1]}],
                 "clarifying_questions": [{"text": "Is the LOS light red?", "options": ["Yes", "No"]}],
                 "customer_reply_draft": "We're checking your line.", "risk_flags": []}), {}
         if kind == "summary":
@@ -80,7 +80,7 @@ class FakeLLM:
                                "failed_attempts": ["Router restart"], "customer_self_help": ["Restart router"],
                                "escalation_criteria": "Wired drops", "tags": ["wifi"]}), {}
         if kind == "stepchat":
-            needs = "agent" in user.casefold() or "human" in user.casefold()
+            needs = "admin" in user.casefold() or "human" in user.casefold()
             return json.dumps({"reply": "Hold the power button for 10 seconds.", "needs_human": needs}), {}
         if kind == "judge":
             n = len(json.loads(user))

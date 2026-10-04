@@ -1,4 +1,4 @@
-"""HTTP API (FastAPI): customer portal, agent console, admin, SSE stream, health/metrics, and the
+"""HTTP API (FastAPI): customer portal, admin console, SSE stream, health/metrics, and the
 React single-page app. In monolith mode the notification service is mounted at /notify."""
 
 from __future__ import annotations
@@ -30,8 +30,6 @@ from .security import (
     Accounts,
     admin_read,
     admin_write,
-    agent_read,
-    agent_write,
     current_user,
     customer_read,
     customer_write,
@@ -93,7 +91,7 @@ class FeedbackIn(BaseModel):
     comment: str = Field(default="", max_length=2000)
 
 
-class AgentMessageIn(BaseModel):
+class AdminMessageIn(BaseModel):
     body: str = Field(min_length=1, max_length=4000)
     options: list[str] = Field(default_factory=list, max_length=6)
     internal: bool = False
@@ -149,7 +147,7 @@ class ProposalDecisionIn(BaseModel):
 
 
 class UserIn(Registration):
-    role: Literal["customer", "agent", "admin"] = "agent"
+    role: Literal["customer", "admin"] = "admin"
 
 
 def create_app(settings: Settings | None = None, services: Services | None = None,
@@ -342,7 +340,7 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
     # ------------------------------------------------------------------ live events (SSE)
     @app.get("/v1/events", tags=["realtime"])
     async def events(request: Request, user: dict = Depends(current_user)) -> StreamingResponse:
-        channels = [f"user:{user['id']}"] + (["agents"] if user["role"] in ("agent", "admin") else [])
+        channels = [f"user:{user['id']}"] + (["admins"] if user["role"] == "admin" else [])
         queues = [(c, desk.bus.subscribe(c)) for c in channels]
 
         async def stream():
@@ -364,9 +362,9 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
         return StreamingResponse(stream(), media_type="text/event-stream",
                                  headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
-    # ------------------------------------------------------------------ agent console
-    @app.get("/v1/agent/queue", tags=["agent"])
-    async def queue(scope: Literal["human", "open", "all", "mine"] = "human", user: dict = Depends(agent_read)) -> dict:
+    # ------------------------------------------------------------------ admin console
+    @app.get("/v1/admin/queue", tags=["admin"])
+    async def queue(scope: Literal["human", "open", "all", "mine"] = "human", user: dict = Depends(admin_read)) -> dict:
         statuses = {"human": HUMAN_QUEUE, "open": OPEN, "all": None, "mine": None}[scope]
         rows = await asyncio.to_thread(desk.store.list, statuses=statuses,
                                        assignee_id=user["id"] if scope == "mine" else None)
@@ -375,62 +373,62 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
             rows.sort(key=lambda r: (order.get(r.get("severity") or "P3", 2), r.get("sla_hours_left") or 1e9))
         return {"tickets": rows, "counts": await asyncio.to_thread(desk.queue_counts)}
 
-    @app.get("/v1/agent/tickets/{ticket_id}", tags=["agent"])
-    async def agent_ticket(ticket_id: str, user: dict = Depends(agent_read)) -> dict:
-        return await desk.agent_ticket(ticket_id)
+    @app.get("/v1/admin/tickets/{ticket_id}", tags=["admin"])
+    async def admin_ticket(ticket_id: str, user: dict = Depends(admin_read)) -> dict:
+        return await desk.admin_ticket(ticket_id)
 
-    @app.post("/v1/agent/tickets/{ticket_id}/claim", tags=["agent"])
-    async def claim(ticket_id: str, user: dict = Depends(agent_write)) -> dict:
+    @app.post("/v1/admin/tickets/{ticket_id}/claim", tags=["admin"])
+    async def claim(ticket_id: str, user: dict = Depends(admin_write)) -> dict:
         return await desk.claim(user, ticket_id)
 
-    @app.post("/v1/agent/tickets/{ticket_id}/messages", tags=["agent"])
-    async def agent_message(ticket_id: str, data: AgentMessageIn, user: dict = Depends(agent_write)) -> dict:
-        return await desk.agent_message(user, ticket_id, data.body, data.options, data.internal, data.request_info)
+    @app.post("/v1/admin/tickets/{ticket_id}/messages", tags=["admin"])
+    async def admin_message(ticket_id: str, data: AdminMessageIn, user: dict = Depends(admin_write)) -> dict:
+        return await desk.admin_message(user, ticket_id, data.body, data.options, data.internal, data.request_info)
 
-    @app.post("/v1/agent/tickets/{ticket_id}/propose", tags=["agent"])
-    async def propose(ticket_id: str, data: ProposeIn, user: dict = Depends(agent_write)) -> dict:
+    @app.post("/v1/admin/tickets/{ticket_id}/propose", tags=["admin"])
+    async def propose(ticket_id: str, data: ProposeIn, user: dict = Depends(admin_write)) -> dict:
         return await desk.propose_solution(user, ticket_id, data.steps, data.message)
 
-    @app.post("/v1/agent/tickets/{ticket_id}/resolve", tags=["agent"])
-    async def agent_resolve(ticket_id: str, data: NoteIn, user: dict = Depends(agent_write)) -> dict:
-        return await desk.agent_resolve(user, ticket_id, data.note)
+    @app.post("/v1/admin/tickets/{ticket_id}/resolve", tags=["admin"])
+    async def admin_resolve(ticket_id: str, data: NoteIn, user: dict = Depends(admin_write)) -> dict:
+        return await desk.admin_resolve(user, ticket_id, data.note)
 
-    @app.post("/v1/agent/tickets/{ticket_id}/copilot", tags=["agent"])
-    async def copilot(ticket_id: str, user: dict = Depends(agent_write)) -> dict:
+    @app.post("/v1/admin/tickets/{ticket_id}/copilot", tags=["admin"])
+    async def copilot(ticket_id: str, user: dict = Depends(admin_write)) -> dict:
         return await desk.refresh_copilot(ticket_id)
 
-    @app.get("/v1/agent/tickets/{ticket_id}/emails", tags=["agent"])
-    async def ticket_emails(ticket_id: str, user: dict = Depends(agent_read)) -> dict:
+    @app.get("/v1/admin/tickets/{ticket_id}/emails", tags=["admin"])
+    async def ticket_emails(ticket_id: str, user: dict = Depends(admin_read)) -> dict:
         return {"emails": await asyncio.to_thread(services.notifications.list, ticket_id)}
 
-    @app.post("/v1/agent/analyze", tags=["agent"])
-    async def playground(data: AnalyzeIn, request: Request, user: dict = Depends(agent_write)) -> dict:
+    @app.post("/v1/admin/analyze", tags=["admin"])
+    async def playground(data: AnalyzeIn, request: Request, user: dict = Depends(admin_write)) -> dict:
         await limit(request, "playground", 30, 600)
         return await desk.analyze_text(data.text, None, data.product_hint, data.use_cache)
 
-    @app.get("/v1/agent/traces/{trace_id}", tags=["agent"])
-    def trace(trace_id: str, user: dict = Depends(agent_read)) -> dict:
+    @app.get("/v1/admin/traces/{trace_id}", tags=["admin"])
+    def trace(trace_id: str, user: dict = Depends(admin_read)) -> dict:
         with services.db.read() as con:
             row = con.execute(sa.select(traces).where(traces.c.trace_id == trace_id)).first()
         if not row:
             raise HTTPException(404, "Trace not found")
         return {**dict(row._mapping), "created_at": row.created_at.isoformat()}
 
-    @app.get("/v1/agent/incidents", tags=["agent"])
-    async def list_incidents(user: dict = Depends(agent_read)) -> dict:
+    @app.get("/v1/admin/incidents", tags=["admin"])
+    async def list_incidents(user: dict = Depends(admin_read)) -> dict:
         return {"incidents": await asyncio.to_thread(services.incidents.list)}
 
-    @app.post("/v1/agent/incidents/{incident_id}/resolve", tags=["agent"])
-    async def resolve_incident(incident_id: str, data: NoteIn, user: dict = Depends(agent_write)) -> dict:
+    @app.post("/v1/admin/incidents/{incident_id}/resolve", tags=["admin"])
+    async def resolve_incident(incident_id: str, data: NoteIn, user: dict = Depends(admin_write)) -> dict:
         return await desk.resolve_incident(user, incident_id, data.note)
 
-    @app.get("/v1/agent/stats", tags=["agent"])
-    async def stats(user: dict = Depends(agent_read)) -> dict:
+    @app.get("/v1/admin/stats", tags=["admin"])
+    async def stats(user: dict = Depends(admin_read)) -> dict:
         return await asyncio.to_thread(overview, services.db)
 
     # ------------------------------------------------------------------ admin: knowledge, taxonomy, drift
     @app.get("/v1/admin/kb", tags=["admin"])
-    async def kb(status: str | None = None, user: dict = Depends(agent_read)) -> dict:
+    async def kb(status: str | None = None, user: dict = Depends(admin_read)) -> dict:
         return {"articles": await asyncio.to_thread(desk.kb_list, status)}
 
     @app.post("/v1/admin/kb", tags=["admin"])
@@ -444,7 +442,7 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
         return await desk.kb_decide(user, kb_id, data.action, data.edits)
 
     @app.get("/v1/admin/taxonomy", tags=["admin"])
-    async def taxonomy(user: dict = Depends(agent_read)) -> dict:
+    async def taxonomy(user: dict = Depends(admin_read)) -> dict:
         return {"version": services.registry.version(),
                 "classes": await asyncio.to_thread(services.registry.classes, True),
                 "history": await asyncio.to_thread(services.registry.history)}
@@ -456,7 +454,7 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
         return {"version": version}
 
     @app.get("/v1/admin/discovery", tags=["admin"])
-    async def discovery(user: dict = Depends(agent_read)) -> dict:
+    async def discovery(user: dict = Depends(admin_read)) -> dict:
         return {"pool": await asyncio.to_thread(services.discovery.pool),
                 "proposals": await asyncio.to_thread(services.discovery.proposals, None)}
 
@@ -469,7 +467,7 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
         return await asyncio.to_thread(services.discovery.decide, proposal_id, user["id"], data.decision, data.edits)
 
     @app.get("/v1/admin/drift", tags=["admin"])
-    async def drift(days: int = 7, user: dict = Depends(agent_read)) -> dict:
+    async def drift(days: int = 7, user: dict = Depends(admin_read)) -> dict:
         current = await asyncio.to_thread(services.drift.compute, days, True)
         return {**current, "history": await asyncio.to_thread(services.drift.history)}
 
@@ -479,7 +477,7 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
         return {"kb_id": kb_id, "flagged": True}
 
     @app.get("/v1/admin/health", tags=["admin"])
-    async def system_health(user: dict = Depends(agent_read)) -> dict:
+    async def system_health(user: dict = Depends(admin_read)) -> dict:
         return {
             "components": {"database": await asyncio.to_thread(services.db.ping),
                            "vector_store": {"backend": services.index.backend, "ok": await services.index.ping()},
@@ -496,11 +494,11 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
         return {"replayed": await asyncio.to_thread(services.outbox.replay, None)}
 
     @app.get("/v1/admin/emails", tags=["admin"])
-    async def emails(user: dict = Depends(agent_read)) -> dict:
+    async def emails(user: dict = Depends(admin_read)) -> dict:
         return {"emails": await asyncio.to_thread(services.notifications.list, None, 100)}
 
     @app.get("/v1/admin/evals", tags=["admin"])
-    def evals(user: dict = Depends(agent_read)) -> dict:
+    def evals(user: dict = Depends(admin_read)) -> dict:
         with services.db.read() as con:
             rows = con.execute(sa.select(eval_runs).order_by(eval_runs.c.created_at.desc()).limit(20)).all()
         return {"runs": [{**dict(r._mapping), "created_at": r.created_at.isoformat()} for r in rows]}

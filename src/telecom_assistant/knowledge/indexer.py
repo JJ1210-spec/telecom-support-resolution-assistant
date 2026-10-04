@@ -42,17 +42,17 @@ def kb_chunks(article: dict) -> list[dict]:
     base = {"kind": "kb", "kb_id": article["kb_id"], "title": title, "product": article.get("product"),
             "intent": article.get("intent"), "status": article["status"], "version": article["version"],
             "origin": article.get("origin", "seed")}
-    chunks = [{**base, "source_id": f"{article['kb_id']}#summary", "section": "summary", "audience": "agent",
+    chunks = [{**base, "source_id": f"{article['kb_id']}#summary", "section": "summary", "audience": "admin",
                "text": f"{title}. {article.get('summary', '')}"}]
     for index, step in enumerate(article.get("self_help") or [], 1):
         chunks.append({**base, "source_id": f"{article['kb_id']}#h{index}", "section": f"self-help {index}",
                        "audience": "customer", "text": f"{title} — customer self-help {index}: {step}"})
     for index, check in enumerate(article.get("checks") or [], 1):
-        chunks.append({**base, "source_id": f"{article['kb_id']}#c{index}", "section": f"agent check {index}",
-                       "audience": "agent", "text": f"{title} — agent check {index}: {check}"})
+        chunks.append({**base, "source_id": f"{article['kb_id']}#c{index}", "section": f"admin check {index}",
+                       "audience": "admin", "text": f"{title} — admin check {index}: {check}"})
     if article.get("escalation"):
         chunks.append({**base, "source_id": f"{article['kb_id']}#escalation", "section": "escalation",
-                       "audience": "agent", "text": f"{title} — escalation: {article['escalation']}"})
+                       "audience": "admin", "text": f"{title} — escalation: {article['escalation']}"})
     return chunks
 
 

@@ -1,6 +1,6 @@
 # Synthetic Telecom Support Dataset v1
 
-This is an **original synthetic** dataset for the telecom resolution assistant. The [Tobi-Bueck customer-support-tickets dataset](https://huggingface.co/datasets/Tobi-Bueck/customer-support-tickets) informed the basic ticket shape (`subject`, `body`, `type`, `queue`, `priority`, `language`, tags and an agent answer). No source rows or answers were copied. The reference dataset has a CC BY-NC 4.0 license; this generated dataset is a separate original artifact and does not inherit a verified real-world outcome from it.
+This is an **original synthetic** dataset for the telecom resolution assistant. The [Tobi-Bueck customer-support-tickets dataset](https://huggingface.co/datasets/Tobi-Bueck/customer-support-tickets) informed the basic ticket shape (`subject`, `body`, `type`, `queue`, `priority`, `language`, tags and a support reply). No source rows or answers were copied. The reference dataset has a CC BY-NC 4.0 license; this generated dataset is a separate original artifact and does not inherit a verified real-world outcome from it.
 
 ## Files and intended use
 

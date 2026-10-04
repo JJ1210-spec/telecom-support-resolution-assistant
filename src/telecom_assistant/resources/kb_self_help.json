@@ -1,5 +1,5 @@
 {
-  "_note": "Customer-safe self-help sections merged into the seed KB. Steps shown to customers may cite ONLY these sections (#h1, #h2 ...); agent-only checks (#c1 ...) never reach the customer view.",
+  "_note": "Customer-safe self-help sections merged into the seed KB. Steps shown to customers may cite ONLY these sections (#h1, #h2 ...); admin-only checks (#c1 ...) never reach the customer view.",
   "KB-BB-DROP": [
     "Restart the router: switch it off at the wall, wait 30 seconds, and switch it back on. Wait 3 minutes for all lights to settle.",
     "Note the exact times the connection drops and which devices are affected - this helps us find a pattern.",

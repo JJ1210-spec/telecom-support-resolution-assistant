@@ -51,12 +51,22 @@ def _snippet(payload: dict) -> str:
 
 def to_source(hit, kind: str) -> dict:
     payload = hit.payload
+    text = payload.get("text", "")
+    section = payload.get("section")
+    check_number = hit.source_id.rsplit("#c", 1)[-1]
+    if kind == "kb" and "#c" in hit.source_id and check_number.isdigit() and " — " in text:
+        _, _, check_text = text.rpartition(" — ")
+        _, separator, action = check_text.partition(": ")
+        if separator:
+            text = f"{payload.get('title', '')} — admin check {check_number}: {action}"
+            section = f"admin check {check_number}"
     return {
-        "id": hit.source_id, "kind": kind, "title": payload.get("title", ""), "snippet": _snippet(payload),
-        "text": payload.get("text", ""), "intent": payload.get("intent"), "product": payload.get("product"),
+        "id": hit.source_id, "kind": kind, "title": payload.get("title", ""),
+        "snippet": _snippet({**payload, "text": text}),
+        "text": text, "intent": payload.get("intent"), "product": payload.get("product"),
         "severity": payload.get("severity"), "root_cause": payload.get("root_cause"),
-        "steps": payload.get("steps") or [], "section": payload.get("section"), "kb_id": payload.get("kb_id"),
-        "audience": payload.get("audience", "agent"),
+        "steps": payload.get("steps") or [], "section": section, "kb_id": payload.get("kb_id"),
+        "audience": "customer" if payload.get("audience") == "customer" else "admin",
         "origin": payload.get("origin"), "outcome_score": payload.get("outcome_score"),
         "resolved_at": payload.get("resolved_at"),
         "similarity": round(hit.dense_score, 4) if hit.dense_score is not None else None,

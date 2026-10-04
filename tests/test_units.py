@@ -49,23 +49,23 @@ def test_likelihoods_are_distributions_and_update_concentrates_posterior():
 
 def _sources():
     return [{"id": "KB-1#h1", "kind": "kb", "audience": "customer", "text": "restart router"},
-            {"id": "KB-1#c1", "kind": "kb", "audience": "agent", "text": "line test"},
-            {"id": "T-1", "kind": "ticket", "audience": "agent", "text": "changed channel"}]
+            {"id": "KB-1#c1", "kind": "kb", "audience": "admin", "text": "line test"},
+            {"id": "T-1", "kind": "ticket", "audience": "admin", "text": "changed channel"}]
 
 
 def test_citation_validation_enforces_grounding_and_customer_gate():
     draft = {"customer_steps": [{"text": "Restart the router", "citations": ["KB-1#h1", "FAKE"]},
                                 {"text": "Run a line test yourself", "citations": ["KB-1#c1"]},
                                 {"text": "Made up", "citations": ["NOPE"]}],
-             "agent_steps": [{"text": "Run line test", "citations": ["KB-1#c1"]},
+             "admin_steps": [{"text": "Run line test", "citations": ["KB-1#c1"]},
                              {"text": "Offer a refund within 2 days", "citations": ["T-1"]}],
              "probable_root_cause": {"text": "x", "citations": ["NOPE"]}, "customer_message": "We guarantee it"}
     out, warnings = validate_citations(draft, _sources())
     assert [s["text"] for s in out["customer_steps"]] == ["Restart the router"]
     assert out["customer_steps"][0]["citations"] == ["KB-1#h1"]
-    agent_texts = [s["text"] for s in out["agent_steps"]]
-    assert "Run a line test yourself" in agent_texts  # demoted: not backed by a self-help section
-    assert not any("refund" in t for t in agent_texts)
+    admin_texts = [s["text"] for s in out["admin_steps"]]
+    assert "Run a line test yourself" in admin_texts  # demoted: not backed by a self-help section
+    assert not any("refund" in t for t in admin_texts)
     assert out["probable_root_cause"] is None and out["customer_message"] == ""
     assert out["citation_validity"] == 1.0 and warnings
 
@@ -80,10 +80,10 @@ def test_customer_step_evidence_exposes_only_safe_source_details():
         "sources": [
             {"id": "KB-1#h1", "kind": "kb", "audience": "customer", "title": "Router guide",
              "snippet": "Check the router light."},
-            {"id": "KB-1#c1", "kind": "kb", "audience": "agent", "title": "Router guide",
+            {"id": "KB-1#c1", "kind": "kb", "audience": "admin", "title": "Router guide",
              "snippet": "Private line test instructions"},
             {"id": "T-PAST", "kind": "ticket", "title": "Another customer's complaint",
-             "snippet": "Private customer details and agent actions"},
+             "snippet": "Private customer details and admin actions"},
         ],
     }
     view = TicketStore.customer_view(ticket)

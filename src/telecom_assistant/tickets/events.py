@@ -1,4 +1,4 @@
-"""In-process pub/sub feeding Server-Sent Events: customers get their own tickets' updates, agents get
+"""In-process pub/sub feeding Server-Sent Events: customers get their own tickets' updates, admins get
 the queue. (Multi-instance deployments would swap this for Redis pub/sub; the UI also polls as a fallback.)"""
 
 from __future__ import annotations
@@ -30,4 +30,4 @@ class EventBus:
                     queue.put_nowait(message)
 
     def ticket(self, ticket_id: str, owner_id: str, kind: str, **data) -> None:
-        self.publish([f"user:{owner_id}", "agents"], kind, {"ticket_id": ticket_id, **data})
+        self.publish([f"user:{owner_id}", "admins"], kind, {"ticket_id": ticket_id, **data})

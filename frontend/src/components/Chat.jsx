@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ago } from "./ui";
 import { Icon } from "./Icon";
-const AUTHOR = { customer: "You", agent: "Support specialist", ai: "Resolve assistant", system: "Update" };
+const AUTHOR = { customer: "You", admin: "Support admin", ai: "Resolve assistant", system: "Update" };
 /** Conversation thread. `viewer` decides which side is "me". Quick-reply options render as chips. */
 export function Thread({ messages, viewer, onQuickReply, disabled }) {
   const end = useRef(null);
@@ -16,7 +16,8 @@ export function Thread({ messages, viewer, onQuickReply, disabled }) {
   return (
     <div className="thread">
       {messages.map((m, index) => {
-        const mine = m.author_role === viewer;
+        const mine = m.author_role === viewer ||
+          (viewer === "admin" && !["customer", "ai", "system"].includes(m.author_role));
         const cls = mine
           ? "me"
           : m.author_role === "ai"
@@ -26,11 +27,11 @@ export function Thread({ messages, viewer, onQuickReply, disabled }) {
               : "them";
         const internal = m.visibility === "internal";
         const who =
-          viewer === "agent" && m.author_role === "customer"
+          viewer === "admin" && m.author_role === "customer"
             ? "Customer"
-            : viewer === "agent" && m.author_role === "agent"
-              ? "Agent"
-              : AUTHOR[m.author_role];
+            : viewer === "admin" && mine
+              ? "Admin"
+              : AUTHOR[m.author_role] ?? "Support admin";
         return (
           <div key={m.id} className={`msg ${cls}${internal ? " internal" : ""}`}>
             <div style={{ minWidth: 0 }}>
@@ -63,7 +64,7 @@ export function Thread({ messages, viewer, onQuickReply, disabled }) {
                     </span>
                   </div>
                 )}
-              {m.options && m.options.length > 0 && viewer === "agent" && (
+              {m.options && m.options.length > 0 && viewer === "admin" && (
                 <div className="caption" style={{ marginTop: 6 }}>
                   Quick replies offered: {m.options.join(" · ")}
                 </div>

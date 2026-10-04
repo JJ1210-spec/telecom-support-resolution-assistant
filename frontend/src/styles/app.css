@@ -190,7 +190,7 @@ img { max-width: 100%; }
   font-size: 13px; font-weight: 600; color: var(--ink);
 }
 
-/* ---------- console (agent/admin) ---------- */
+/* ---------- admin console ---------- */
 .console { display: grid; grid-template-columns: 232px minmax(0, 1fr); min-height: 100vh; background: var(--surface-soft); }
 .sidebar {
   position: sticky; top: 0; height: 100vh; background: var(--surface-dark); color: #fff; padding: 20px 12px;

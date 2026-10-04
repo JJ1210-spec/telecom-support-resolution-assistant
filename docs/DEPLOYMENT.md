@@ -52,8 +52,8 @@ GitHub using the `Dockerfile` and `render.yaml` in this repo.
 8. **Check it works:**
    - `https://<your-url>/health` shows `{"status":"ok"}`;
    - `https://<your-url>/ready` shows `"database":true,"vector_store":true,"kv":true`;
-   - the home page loads, and you can sign in with `customer@resolvedesk.dev` / `agent@resolvedesk.dev` /
-     `admin@resolvedesk.dev` (password = `DEMO_PASSWORD` in your `.env`).
+   - the home page loads, and you can sign in with `customer@resolvedesk.dev` or `admin@resolvedesk.dev`
+     (password = `DEMO_PASSWORD` in your `.env`).
 
 ### Things to know about the free plan
 - **It sleeps after 15 minutes without traffic.** The first visit after that takes about 50 seconds to wake up.
@@ -85,6 +85,17 @@ GitHub using the `Dockerfile` and `render.yaml` in this repo.
 - **Free LLM quotas:** about 1,000 requests a day per model and 15–30 per minute. Fine for demos. The **System
   health** page shows the meters.
 - **CI:** every push runs tests and the frontend build on GitHub Actions (`.github/workflows/ci.yml`).
+
+## Roll back a deployment
+
+The previous working code is preserved at Git tag `rollback/admin-only-base-20261004` (commit `00ec8a0`).
+This update changes application code and documentation only; it does not migrate or delete database records or
+change the hosted vector collections. The previous code can therefore use the same hosted data.
+
+If a deployment fails, open the Render service's **Events** page and use **Rollback** on the last successful
+deployment. If that deployment is no longer listed, use **Manual Deploy → Deploy a specific commit** and enter
+`00ec8a0`. Check `/health`, `/ready`, customer sign-in, and admin sign-in after the rollback. To keep the
+deployed branch on the old code, revert this change's commit on `main` and push the revert.
 
 ---
 

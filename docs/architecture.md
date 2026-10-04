@@ -13,7 +13,7 @@ alternatives that were considered.
 flowchart LR
   subgraph Client["React SPA (Vite + JSX)"]
     C["Customer portal<br/>intake wizard · step checklist ·<br/>per-step chat · confirm/reopen"]
-    A["Agent / admin console<br/>queue · copilot · incidents ·<br/>KB review · taxonomy · drift · health"]
+    A["Admin console<br/>queue · copilot · incidents ·<br/>KB review · taxonomy · drift · health"]
   end
 
   subgraph Core["Core API — FastAPI (stateless)"]
@@ -77,7 +77,7 @@ Upstash, so every replica sees the same values.
 | Upstash | In-memory cache and quotas |
 | Email delivery | Exponential backoff, then a dead-letter queue (DLQ) with replay |
 
-Every degradation is recorded in the trace and shown to agents.
+Every degradation is recorded in the trace and shown to admins.
 
 ## 2. Ticket lifecycle
 
@@ -87,14 +87,14 @@ stateDiagram-v2
   analyzing --> self_service: route = self_service
   analyzing --> escalated: route = assisted | human | analysis failure
   self_service --> resolved: customer confirms
-  self_service --> escalated: every step "didn't work" / step chat needs human / "talk to a specialist"
-  escalated --> in_progress: agent claims or replies
-  in_progress --> awaiting_customer: agent asks (with quick-reply options)
+  self_service --> escalated: every step "didn't work" / step chat needs human / "talk to an admin"
+  escalated --> in_progress: admin claims or replies
+  in_progress --> awaiting_customer: admin asks (with quick-reply options)
   awaiting_customer --> in_progress: customer replies
-  in_progress --> solution_proposed: agent proposes fix (new step plan)
+  in_progress --> solution_proposed: admin proposes fix (new step plan)
   solution_proposed --> resolved: customer confirms it worked
   solution_proposed --> in_progress: "still not working" (reopen_count++)
-  in_progress --> resolved: agent resolves with written note
+  in_progress --> resolved: admin resolves with written note
   resolved --> in_progress: problem came back (reopen, learned case down-weighted)
   resolved --> learned: outbox "learn" -> summary indexed + KB draft
 ```
@@ -173,7 +173,7 @@ cross-encoder.
 
 The dense cosine is kept separately because it is calibrated enough to gate on (abstention, OOD and
 recurrence), which RRF scores are not. KB articles are chunked per section (`#summary`, `#h1..` customer
-self-help, `#c1..` agent checks, `#escalation`). At draft time the triaged intent's own article is expanded
+self-help, `#c1..` admin checks, `#escalation`). At draft time the triaged intent's own article is expanded
 in full (parent-document expansion).
 
 ### 4.3 Grounding and the customer-safety gate
@@ -181,7 +181,7 @@ in full (parent-document expansion).
 
 - drops citations that were not in the supplied evidence, then drops steps left with no citation;
 - drops steps that make unsupported commitments (refunds, compensation, time promises);
-- moves any *customer* step that is not backed by a self-help (`#h`) section to the agent steps;
+- moves any *customer* step that is not backed by a self-help (`#h`) section to the admin steps;
 - drops unsafe customer actions (factory reset, sharing an OTP);
 - abstains when more than half of the steps fail validation.
 
@@ -192,10 +192,10 @@ different model from the generator, check that each step is supported by its sou
 | Route | Rule (all must hold) | Customer sees |
 |---|---|---|
 | `self_service` | P3/P4 · triage confidence ≥ 0.62 · ≥ 3 strongly similar resolved cases (recurrence) · ≥ 1 grounded self-help step · not sensitive | Steps immediately; ticket live until they confirm |
-| `assisted` | No blocker, but P2, lower confidence, rarer, or churn risk | Safe steps **and** a specialist reviews |
-| `human` | Any blocker: P1 · sensitive intent (billing dispute, identity, porting, fiber LOS) · unknown class · prompt injection · abstention · no LLM · "something else" | No AI steps; agent gets a copilot brief |
+| `assisted` | No blocker, but P2, lower confidence, rarer, or churn risk | Safe steps **and** an admin reviews |
+| `human` | Any blocker: P1 · sensitive intent (billing dispute, identity, porting, fiber LOS) · unknown class · prompt injection · abstention · no LLM · "something else" | No AI steps; admin gets a copilot brief |
 
-Every decision stores its reasons, recurrence count, decision confidence and top similarity. Agents see these
+Every decision stores its reasons, recurrence count, decision confidence and top similarity. Admins see these
 values, and the customer sees a plain-language "why".
 
 ### 4.5 Severity
@@ -212,7 +212,7 @@ reasons, which protects P1 recall.
 
 ```mermaid
 flowchart LR
-  R["Customer confirms fix<br/>(or agent resolves with note)"] --> O["outbox: learn"]
+  R["Customer confirms fix<br/>(or admin resolves with note)"] --> O["outbox: learn"]
   O --> S["Summarizer LLM: problem, what failed,<br/>what worked, root cause, self-help"]
   S --> I["Index as searchable case LRN-&lt;ticket&gt;<br/>(outcome 0.9 if customer-confirmed)"]
   S --> N{"Covered by existing KB?<br/>(closest KB similarity ≥ 0.80)"}
@@ -283,12 +283,12 @@ An embedding-model change is a blue/green rebuild into new Qdrant collections, f
 ## 9. Design decisions (ADR summary)
 1. **Information-gain questions instead of a fixed form or free-form LLM chat.** A fixed form asks irrelevant
    questions, and an LLM interviewer is slow, costly and hard to evaluate. IG over a data-driven bank is
-   deterministic, explainable (bits gained are shown to the customer and the agent), testable with an oracle
+   deterministic, explainable (bits gained are shown to the customer and the admin), testable with an oracle
    customer in the eval, and extensible without code.
 2. **Three routes instead of a binary auto/escalate split.** The `assisted` route keeps P2 and borderline
    cases moving: the customer can often fix it while a human is already looking, and safety-critical cases never
    get AI steps.
-3. **Customer steps may cite only self-help sections.** The model cannot be trusted to tell agent-only actions
+3. **Customer steps may cite only self-help sections.** The model cannot be trusted to tell admin-only actions
    (provisioning, line tests) from customer-safe ones. The KB says which is which, and code enforces it.
 4. **Postgres as the system of record, Qdrant as derived data.** Every vector can be rebuilt from the database
    plus the embedding cache, so a lost free cluster is a restore job rather than data loss.

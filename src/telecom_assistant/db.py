@@ -48,7 +48,7 @@ users = sa.Table(
     sa.Column("email", sa.String(254), nullable=False, unique=True),
     sa.Column("name", sa.String(120), nullable=False, server_default=""),
     sa.Column("password_hash", sa.String(255), nullable=False),
-    sa.Column("role", sa.String(16), nullable=False),  # customer | agent | admin
+    sa.Column("role", sa.String(16), nullable=False),  # customer | admin
     sa.Column("region", sa.String(80), nullable=True),
     sa.Column("failed_attempts", sa.Integer, nullable=False, server_default="0"),
     sa.Column("locked_until", sa.Integer, nullable=False, server_default="0"),
@@ -116,7 +116,7 @@ messages = sa.Table(
     sa.Column("id", sa.String(40), primary_key=True),
     sa.Column("ticket_id", sa.String(32), nullable=False, index=True),
     sa.Column("author_id", sa.String(40), nullable=False),
-    sa.Column("author_role", sa.String(16), nullable=False),  # customer | agent | ai | system
+    sa.Column("author_role", sa.String(16), nullable=False),  # customer | admin | ai | system
     sa.Column("body", sa.Text, nullable=False),
     sa.Column("options", sa.JSON, nullable=True),  # quick-reply choices
     sa.Column("answered_option", sa.String(200), nullable=True),
@@ -129,7 +129,7 @@ steps = sa.Table(
     "steps", metadata,
     sa.Column("id", sa.String(40), primary_key=True),
     sa.Column("ticket_id", sa.String(32), nullable=False, index=True),
-    sa.Column("origin", sa.String(16), nullable=False),  # ai | agent
+    sa.Column("origin", sa.String(16), nullable=False),  # ai | admin
     sa.Column("plan_version", sa.Integer, nullable=False, server_default="1"),
     sa.Column("position", sa.Integer, nullable=False),
     sa.Column("text", sa.Text, nullable=False),

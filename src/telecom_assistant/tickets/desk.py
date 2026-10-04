@@ -9,9 +9,9 @@ Flow for a new ticket
    citation validation -> routing decision -> incident radar -> discovery pool -> trace.
 4. self_service / assisted: customer gets a checklist of grounded steps with "worked / didn't work" and a
    per-step chat. All steps failing (or asking for a human) escalates the same ticket with the attempt log.
-5. human: agents get a copilot brief (similar incidents, root causes, next actions excluding what failed,
+5. human: admins get a copilot brief (similar incidents, root causes, next actions excluding what failed,
    clarifying questions with quick-reply options, reply draft).
-6. Agent replies / asks for info with quick-reply options / proposes a solution; the customer confirms or
+6. Admin replies / asks for info with quick-reply options / proposes a solution; the customer confirms or
    reopens. The ticket stays live until confirmed.
 7. Resolved -> outbox "learn": the whole process is summarized, indexed as a new searchable case, and a KB
    article is proposed when the fix is novel. Reopening later down-weights that learned case.
@@ -50,8 +50,8 @@ class Forbidden(PermissionError):
 
 CUSTOMER_REASON = {
     "self_service": "We've solved this exact issue {n} times before, so here are steps you can try right now.",
-    "assisted": "A specialist is reviewing your ticket. Meanwhile, these safe checks may fix it faster.",
-    "human": "This needs a specialist, so we've sent it straight to our support team.",
+    "assisted": "An admin is reviewing your ticket. Meanwhile, these safe checks may fix it faster.",
+    "human": "This needs an admin, so we've sent it straight to our support team.",
 }
 
 
@@ -152,7 +152,7 @@ class SupportDesk:
 
     async def run_analysis(self, redacted: str, intake: dict | None, product_hint: str | None, trace_id: str,
                            progress=None) -> dict:
-        """Stateless analysis used by tickets, the agent playground and the eval harness."""
+        """Stateless analysis used by tickets, the admin playground and the eval harness."""
         timer = Timer()
         degraded: list[str] = []
         progress = progress or (lambda stage: None)
@@ -176,7 +176,7 @@ class SupportDesk:
         decision = route(self.s.settings, triage, retrieval, draft, self.s.registry.by_intent(), intake)
         decision["customer_reason"] = CUSTOMER_REASON[decision["route"]].format(n=decision["recurrence"])
         cited_ids = {citation for step in (draft or {}).get("customer_steps", []) +
-                     (draft or {}).get("agent_steps", []) for citation in step.get("citations", [])}
+                     (draft or {}).get("admin_steps", []) for citation in step.get("citations", [])}
         all_sources = list(dict((s["id"], s) for s in sources + retrieval.tickets).values())
         compact_sources = [{k: s.get(k) for k in ("id", "kind", "title", "snippet", "similarity", "rerank", "rrf",
                                                   "intent", "product", "audience", "root_cause", "steps", "origin",
@@ -253,11 +253,11 @@ class SupportDesk:
             def _fail() -> None:
                 with self.s.db.tx() as con:
                     self.store.transition(con, ticket_id, "escalated", "system", "system",
-                                          {"reason": "Automatic analysis failed; sent to a specialist"},
+                                          {"reason": "Automatic analysis failed; sent to an admin"},
                                           analysis_state="failed", route="human",
                                           sla_due_at=self.store.sla_due("P2"))
                     self.store.add_message(con, ticket_id, "system", "system",
-                                           "We've received your request and a specialist will take it from here.")
+                                           "We've received your request and an admin will take it from here.")
 
             await asyncio.to_thread(_fail)
             self._notify(ticket, "analyzed")
@@ -270,7 +270,7 @@ class SupportDesk:
         vector = as_vector(result.get("query_vector"))
         route_name = decision["route"]
         customer_steps = draft.get("customer_steps", []) if route_name in ("self_service", "assisted") else []
-        agent_steps = draft.get("agent_steps", [])
+        admin_steps = draft.get("admin_steps", [])
         status = "self_service" if route_name == "self_service" else "escalated"
         created_at = datetime.fromisoformat(ticket["created_at"]) if ticket.get("created_at") else None
 
@@ -295,8 +295,8 @@ class SupportDesk:
                                   sla_due_at=self.store.sla_due(triage["severity"], created_at))
                 if customer_steps:
                     self.store.replace_steps(con, ticket_id, "ai", customer_steps, True, 1)
-                if agent_steps:
-                    self.store.replace_steps(con, ticket_id, "ai", agent_steps, False, 1)
+                if admin_steps:
+                    self.store.replace_steps(con, ticket_id, "ai", admin_steps, False, 1)
                 self.store.transition(con, ticket_id, status, "system", "system",
                                       {"route": route_name, "reasons": decision["reasons"]})
                 self.store.event(con, ticket_id, "system", "system", "analyzed",
@@ -385,7 +385,7 @@ class SupportDesk:
                     self.store.transition(con, ticket_id, "escalated", "system", "system",
                                           {"reason": "Customer tried every suggested step without success"})
                     self.store.add_message(con, ticket_id, "system", "system",
-                                           "None of the steps worked, so we've passed your ticket to a specialist "
+                                           "None of the steps worked, so we've passed your ticket to an admin "
                                            "along with everything you tried. You won't need to repeat yourself.")
 
         await asyncio.to_thread(_write)
@@ -470,7 +470,7 @@ class SupportDesk:
         def _write() -> None:
             with self.s.db.tx() as con:
                 self.store.transition(con, ticket_id, "escalated", user["id"], "customer",
-                                      {"reason": reason or "Customer asked for a specialist"})
+                                      {"reason": reason or "Customer asked for an admin"})
                 self.store.event(con, ticket_id, user["id"], "customer", "escalated", {"reason": reason})
 
         await asyncio.to_thread(_write)
@@ -500,7 +500,7 @@ class SupportDesk:
 
     async def _reopen(self, ticket: dict, user: dict, note: str) -> None:
         if ticket["status"] not in ("self_service", "solution_proposed", "resolved", "awaiting_customer"):
-            raise InvalidTransition("Nothing to reopen - the ticket is already with a specialist")
+            raise InvalidTransition("Nothing to reopen - the ticket is already with an admin")
         target = "escalated" if ticket["status"] == "self_service" or not ticket.get("assignee_id") else "in_progress"
         was_resolved = ticket["status"] == "resolved"
 
@@ -529,97 +529,97 @@ class SupportDesk:
     async def customer_ticket(self, user: dict, ticket_id: str) -> dict:
         return self.store.customer_view(await self._own(ticket_id, user))
 
-    # ------------------------------------------------------------------ agent actions
-    async def agent_ticket(self, ticket_id: str) -> dict:
+    # ------------------------------------------------------------------ admin actions
+    async def admin_ticket(self, ticket_id: str) -> dict:
         ticket = await asyncio.to_thread(self.store.full, ticket_id)
         if not ticket:
             raise NotFound(ticket_id)
         return ticket
 
-    async def claim(self, agent: dict, ticket_id: str) -> dict:
-        ticket = await self.agent_ticket(ticket_id)
+    async def claim(self, admin: dict, ticket_id: str) -> dict:
+        ticket = await self.admin_ticket(ticket_id)
 
         def _write() -> None:
             with self.s.db.tx() as con:
-                self.store.update(con, ticket_id, assignee_id=agent["id"])
-                self.store.event(con, ticket_id, agent["id"], agent["role"], "assigned",
-                                 {"agent": agent.get("name") or agent["email"]})
+                self.store.update(con, ticket_id, assignee_id=admin["id"])
+                self.store.event(con, ticket_id, admin["id"], admin["role"], "assigned",
+                                 {"admin": admin.get("name") or admin["email"]})
                 if ticket["status"] in ("escalated", "self_service"):
-                    self.store.transition(con, ticket_id, "in_progress", agent["id"], agent["role"])
+                    self.store.transition(con, ticket_id, "in_progress", admin["id"], admin["role"])
 
         await asyncio.to_thread(_write)
         self._notify(ticket, "assigned")
-        return await self.agent_ticket(ticket_id)
+        return await self.admin_ticket(ticket_id)
 
-    async def agent_message(self, agent: dict, ticket_id: str, body: str, options: list[str], internal: bool,
+    async def admin_message(self, admin: dict, ticket_id: str, body: str, options: list[str], internal: bool,
                             request_info: bool) -> dict:
-        ticket = await self.agent_ticket(ticket_id)
+        ticket = await self.admin_ticket(ticket_id)
         if ticket["status"] == "closed":
             raise InvalidTransition("Ticket is closed")
 
         def _write() -> None:
             with self.s.db.tx() as con:
-                self.store.add_message(con, ticket_id, agent["id"], "agent", body, options=options or None,
+                self.store.add_message(con, ticket_id, admin["id"], "admin", body, options=options or None,
                                        visibility="internal" if internal else "public")
                 if internal:
                     return
                 if not ticket.get("assignee_id"):
-                    self.store.update(con, ticket_id, assignee_id=agent["id"])
+                    self.store.update(con, ticket_id, assignee_id=admin["id"])
                 if request_info and ticket["status"] in ("escalated", "in_progress", "self_service",
                                                          "solution_proposed"):
                     if ticket["status"] == "self_service":
-                        self.store.transition(con, ticket_id, "in_progress", agent["id"], agent["role"])
-                    self.store.transition(con, ticket_id, "awaiting_customer", agent["id"], agent["role"],
+                        self.store.transition(con, ticket_id, "in_progress", admin["id"], admin["role"])
+                    self.store.transition(con, ticket_id, "awaiting_customer", admin["id"], admin["role"],
                                           {"reason": "More information requested"})
-                    self.store.event(con, ticket_id, agent["id"], agent["role"], "info_requested",
+                    self.store.event(con, ticket_id, admin["id"], admin["role"], "info_requested",
                                      {"options": options})
                 elif ticket["status"] == "escalated":
-                    self.store.transition(con, ticket_id, "in_progress", agent["id"], agent["role"])
-                self._email(con, ticket, "agent_message", message=body, options=options)
+                    self.store.transition(con, ticket_id, "in_progress", admin["id"], admin["role"])
+                self._email(con, ticket, "admin_message", message=body, options=options)
 
         await asyncio.to_thread(_write)
         self._notify(ticket, "message")
-        return await self.agent_ticket(ticket_id)
+        return await self.admin_ticket(ticket_id)
 
-    async def propose_solution(self, agent: dict, ticket_id: str, step_texts: list[str], message: str) -> dict:
-        ticket = await self.agent_ticket(ticket_id)
+    async def propose_solution(self, admin: dict, ticket_id: str, step_texts: list[str], message: str) -> dict:
+        ticket = await self.admin_ticket(ticket_id)
         plan = max((s["plan_version"] for s in ticket["steps"]), default=0) + 1
 
         def _write() -> None:
             with self.s.db.tx() as con:
-                self.store.replace_steps(con, ticket_id, "agent", [{"text": t} for t in step_texts if t.strip()],
+                self.store.replace_steps(con, ticket_id, "admin", [{"text": t} for t in step_texts if t.strip()],
                                          True, plan)
                 if message.strip():
-                    self.store.add_message(con, ticket_id, agent["id"], "agent", message)
+                    self.store.add_message(con, ticket_id, admin["id"], "admin", message)
                 if ticket["status"] in ("escalated", "self_service"):
-                    self.store.transition(con, ticket_id, "in_progress", agent["id"], agent["role"])
-                self.store.transition(con, ticket_id, "solution_proposed", agent["id"], agent["role"],
-                                      {"steps": len(step_texts)}, assignee_id=ticket.get("assignee_id") or agent["id"])
-                self.store.event(con, ticket_id, agent["id"], agent["role"], "solution_proposed",
+                    self.store.transition(con, ticket_id, "in_progress", admin["id"], admin["role"])
+                self.store.transition(con, ticket_id, "solution_proposed", admin["id"], admin["role"],
+                                      {"steps": len(step_texts)}, assignee_id=ticket.get("assignee_id") or admin["id"])
+                self.store.event(con, ticket_id, admin["id"], admin["role"], "solution_proposed",
                                  {"steps": step_texts})
                 self._email(con, ticket, "solution_proposed", steps=step_texts)
 
         await asyncio.to_thread(_write)
         self._notify(ticket, "solution_proposed")
-        return await self.agent_ticket(ticket_id)
+        return await self.admin_ticket(ticket_id)
 
-    async def agent_resolve(self, agent: dict, ticket_id: str, note: str) -> dict:
-        ticket = await self.agent_ticket(ticket_id)
+    async def admin_resolve(self, admin: dict, ticket_id: str, note: str) -> dict:
+        ticket = await self.admin_ticket(ticket_id)
         if not note.strip():
             raise ValueError("A resolution note is required")
 
         def _write() -> None:
             with self.s.db.tx() as con:
-                self.store.transition(con, ticket_id, "resolved", agent["id"], agent["role"],
-                                      {"note": note, "confirmed_by": "agent"})
-                self.store.add_message(con, ticket_id, agent["id"], "agent", note, visibility="internal")
-                self.store.event(con, ticket_id, agent["id"], agent["role"], "resolved", {"confirmed": False})
+                self.store.transition(con, ticket_id, "resolved", admin["id"], admin["role"],
+                                      {"note": note, "confirmed_by": "admin"})
+                self.store.add_message(con, ticket_id, admin["id"], "admin", note, visibility="internal")
+                self.store.event(con, ticket_id, admin["id"], admin["role"], "resolved", {"confirmed": False})
                 enqueue(con, "learn", {"ticket_id": ticket_id, "confirmed": False, "note": note})
 
         await asyncio.to_thread(_write)
-        metrics.inc("resolutions", by="agent", route=ticket.get("route") or "?")
+        metrics.inc("resolutions", by="admin", route=ticket.get("route") or "?")
         self._notify(ticket, "status")
-        return await self.agent_ticket(ticket_id)
+        return await self.admin_ticket(ticket_id)
 
     async def refresh_copilot(self, ticket_id: str) -> dict:
         ticket = await asyncio.to_thread(self.store.full, ticket_id)
@@ -647,10 +647,10 @@ class SupportDesk:
                 self.store.update(con, ticket_id, copilot=brief)
 
         await asyncio.to_thread(_write)
-        self.bus.publish(["agents"], "copilot", {"ticket_id": ticket_id})
+        self.bus.publish(["admins"], "copilot", {"ticket_id": ticket_id})
         return brief
 
-    async def resolve_incident(self, agent: dict, incident_id: str, note: str) -> dict:
+    async def resolve_incident(self, admin: dict, incident_id: str, note: str) -> dict:
         from ..db import incidents as incidents_table
 
         with self.s.db.read() as con:
@@ -660,7 +660,7 @@ class SupportDesk:
             con.execute(incidents_table.update().where(incidents_table.c.id == incident_id).values(
                 status="resolved", resolved_at=utc_now(), public_note=note))
         for member in members:
-            await self.propose_solution(agent, member, [
+            await self.propose_solution(admin, member, [
                 "Check whether your service is working again now.",
                 "If it is still not working, restart your router or phone once and check again."],
                 f"Update on the area issue: {note} Please confirm whether your service is back.")
@@ -679,8 +679,8 @@ class SupportDesk:
             "steps": [{"text": s["text"], "status": s["status"], "origin": s["origin"], "note": s.get("status_note")}
                       for s in ticket["steps"]],
             "messages": [{"from": m["author_role"], "text": m["body"][:600]} for m in ticket["messages"]
-                         if m["visibility"] == "public" or m["author_role"] == "agent"][-25:],
-            "agent_note": note,
+                         if m["visibility"] == "public" or m["author_role"] not in ("customer", "ai", "system")][-25:],
+            "admin_note": note,
         }
         summary = await self.s.summarizer.summarize(ticket, timeline, ticket.get("trace_id"))
         triage = ticket.get("triage") or {}
@@ -692,7 +692,7 @@ class SupportDesk:
             "intent": triage.get("intent"), "product": triage.get("product"), "category": triage.get("category"),
             "severity": triage.get("severity"), "language": triage.get("language"), "status": "resolved",
             "resolved_at": datetime.now(UTC).isoformat(), "closure_evidence": "customer confirmed" if confirmed
-            else "agent resolution note", "source_kind": "learned", "outcome_score": 0.9 if confirmed else 0.7,
+            else "admin resolution note", "source_kind": "learned", "outcome_score": 0.9 if confirmed else 0.7,
         }
         report = await self.s.indexer.index_tickets([record], source="learned")
         kb_hits = await self.s.retriever.search(f"{summary['title']}. {summary['problem']}", top_tickets=1, top_kb=3,

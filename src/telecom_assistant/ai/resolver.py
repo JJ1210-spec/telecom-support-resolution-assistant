@@ -8,7 +8,7 @@ Routing answers the product question "can the customer fix this themselves right
 * ``assisted`` — the customer still gets safe self-help steps, but the ticket also goes to the human
   queue (e.g. P2, churn risk, weaker evidence).
 * ``human`` — complex, high-risk or unclear: P1, sensitive intents (billing disputes, identity, porting),
-  unknown class, prompt-injection, abstention. No AI steps are shown to the customer; the agent gets a
+  unknown class, prompt-injection, abstention. No AI steps are shown to the customer; the admin gets a
   copilot brief instead.
 Every decision carries the list of reasons that produced it.
 """
@@ -42,14 +42,14 @@ class CustomerStep(Cited):
     detail: str = ""
 
 
-class AgentStep(Cited):
+class AdminStep(Cited):
     pass
 
 
 class DraftOut(BaseModel):
     probable_root_cause: Cited | None = None
     customer_steps: list[CustomerStep] = Field(default_factory=list)
-    agent_steps: list[AgentStep] = Field(default_factory=list)
+    admin_steps: list[AdminStep] = Field(default_factory=list)
     customer_message: str = ""
     escalate_if: list[str] = Field(default_factory=list)
     abstain: bool = False
@@ -81,15 +81,15 @@ def validate_citations(draft: dict, sources: list[dict]) -> tuple[dict, list[str
                 warnings.append(f"Dropped unsafe customer action: {step['text'][:60]}")
                 return None
             if not any(c in customer_ids for c in cited):
-                warnings.append(f"Customer step not backed by a self-help section; moved to agent steps: "
+                warnings.append(f"Customer step not backed by a self-help section; moved to admin steps: "
                                 f"{step['text'][:60]}")
                 demoted.append({"text": step["text"], "citations": cited})
                 return None
         return {**step, "citations": cited}
 
-    raw_customer, raw_agent = draft.get("customer_steps", []), draft.get("agent_steps", [])
+    raw_customer, raw_admin = draft.get("customer_steps", []), draft.get("admin_steps", [])
     out["customer_steps"] = [s for s in (clean(step, True) for step in raw_customer) if s]
-    out["agent_steps"] = [s for s in (clean(step, False) for step in raw_agent) if s] + demoted
+    out["admin_steps"] = [s for s in (clean(step, False) for step in raw_admin) if s] + demoted
     root = draft.get("probable_root_cause")
     if root:
         cited = [c for c in root.get("citations", []) if c in by_id]
@@ -97,12 +97,12 @@ def validate_citations(draft: dict, sources: list[dict]) -> tuple[dict, list[str
     if UNSUPPORTED_COMMITMENT.search(out.get("customer_message", "")):
         out["customer_message"] = ""
         warnings.append("Removed customer message containing an unsupported commitment")
-    total = len(raw_customer) + len(raw_agent)
-    kept = len(out["customer_steps"]) + len(out["agent_steps"])
+    total = len(raw_customer) + len(raw_admin)
+    kept = len(out["customer_steps"]) + len(out["admin_steps"])
     if total and kept / total < 0.5 and not out.get("abstain"):
         out["abstain"] = True
         out["abstain_reason"] = "More than half of the drafted steps failed citation validation"
-    cited_steps = out["customer_steps"] + out["agent_steps"]
+    cited_steps = out["customer_steps"] + out["admin_steps"]
     out["citation_coverage"] = round(kept / total, 3) if total else 0.0
     out["citation_validity"] = 1.0 if all(c in by_id for s in cited_steps for c in s["citations"]) else 0.0
     return out, warnings
@@ -135,7 +135,7 @@ def route(settings: Settings, triage: dict, retrieval: RetrievalResult, draft: d
     if intent in (None, "other"):
         blockers.append("Issue does not match a known class (sent to discovery pool)")
     if cls.get("sensitive"):
-        blockers.append(f"'{cls.get('label')}' needs a specialist (account, field or policy action)")
+        blockers.append(f"'{cls.get('label')}' needs an admin (account, field or policy action)")
     if triage.get("prompt_injection"):
         blockers.append("Complaint contains instruction-like text")
     if draft is None:
@@ -201,7 +201,7 @@ class Resolver:
         meta: dict = {"prompt_version": DRAFT_VERSION, "degraded": [], "warnings": []}
         if not sources:
             return ({"abstain": True, "abstain_reason": "No similar resolved case or published article was found",
-                     "customer_steps": [], "agent_steps": [], "citation_coverage": 0.0, "citation_validity": 1.0},
+                     "customer_steps": [], "admin_steps": [], "citation_coverage": 0.0, "citation_validity": 1.0},
                     meta)
         if self.llm is None:
             meta["degraded"].append("draft_llm_disabled")
@@ -212,7 +212,7 @@ class Resolver:
             if s["kind"] == "ticket":
                 body = (f"Problem: {s.get('snippet', '')}\nRoot cause: {s.get('root_cause')}\n"
                         f"Steps: {'; '.join(s.get('steps') or [])}")
-            rendered.append(f'<source id="{s["id"]}" type="{s["kind"]}" audience="{s.get("audience", "agent")}" '
+            rendered.append(f'<source id="{s["id"]}" type="{s["kind"]}" audience="{s.get("audience", "admin")}" '
                             f'similarity="{(s.get("similarity") or 0):.2f}">{body[:450]}</source>')
         user = (f"<complaint>\n{complaint[:3000]}\n</complaint>\n<triage>{json.dumps(self._triage_view(triage))}"
                 f"</triage>\n<already_tried>{json.dumps(tried)}</already_tried>\n<sources>\n" + "\n".join(rendered)

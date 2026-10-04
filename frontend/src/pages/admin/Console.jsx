@@ -20,7 +20,7 @@ import {
 } from "../../components/ui";
 import { useLiveEvents, useResource } from "../../hooks/useLive";
 export function OverviewPage() {
-  const stats = useResource(() => api.get("/v1/agent/stats"), []);
+  const stats = useResource(() => api.get("/v1/admin/stats"), []);
   useLiveEvents((e) => {
     if (["analyzed", "status", "created"].includes(e.kind)) void stats.reload();
   });
@@ -66,7 +66,7 @@ export function OverviewPage() {
                 }))}
               />
               <p className="caption">
-                Self-service resolves simple, recurring issues; assisted gives safe steps while a specialist reviews;
+                Self-service resolves simple, recurring issues; assisted gives safe steps while an admin reviews;
                 human handles P1, sensitive or unclear issues.
               </p>
             </div>
@@ -110,7 +110,7 @@ export function QueuePage() {
   const [scope, setScope] = useState("human");
   const [query, setQuery] = useState("");
   const navigate = useNavigate();
-  const queue = useResource(() => api.get(`/v1/agent/queue?scope=${scope}`), [scope]);
+  const queue = useResource(() => api.get(`/v1/admin/queue?scope=${scope}`), [scope]);
   useLiveEvents(() => void queue.reload());
   const rows = (queue.data?.tickets ?? []).filter(
     (t) =>
@@ -211,7 +211,7 @@ export function PlaygroundPage() {
     setBusy(true);
     setError(null);
     try {
-      setResult(await api.post("/v1/agent/analyze", { text, use_cache: false }));
+      setResult(await api.post("/v1/admin/analyze", { text, use_cache: false }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed");
     } finally {
@@ -276,9 +276,9 @@ export function PlaygroundPage() {
                 </div>
               )}
               <div className="eyebrow" style={{ marginTop: 10 }}>
-                Agent steps
+                Admin steps
               </div>
-              {result.draft?.agent_steps.map((s, i) => (
+              {result.draft?.admin_steps.map((s, i) => (
                 <div key={i} className="body-sm">
                   {i + 1}. {s.text}{" "}
                   {s.citations.map((c) => (
@@ -313,7 +313,7 @@ export function PlaygroundPage() {
                   • {w}
                 </div>
               ))}
-              <a className="caption" href={`/v1/agent/traces/${result.trace_id}`} target="_blank" rel="noreferrer">
+              <a className="caption" href={`/v1/admin/traces/${result.trace_id}`} target="_blank" rel="noreferrer">
                 Full trace {result.trace_id}
               </a>
             </div>
@@ -339,7 +339,7 @@ export function PlaygroundPage() {
   );
 }
 export function IncidentsPage() {
-  const list = useResource(() => api.get("/v1/agent/incidents"), []);
+  const list = useResource(() => api.get("/v1/admin/incidents"), []);
   const [note, setNote] = useState({});
   const [toast, showToast] = useToast();
   useLiveEvents((e) => {
@@ -386,7 +386,7 @@ export function IncidentsPage() {
                     disabled={(note[i.id] ?? "").trim().length < 3}
                     onClick={async () => {
                       try {
-                        const r = await api.post(`/v1/agent/incidents/${i.id}/resolve`, { note: note[i.id] });
+                        const r = await api.post(`/v1/admin/incidents/${i.id}/resolve`, { note: note[i.id] });
                         showToast(`Proposed the fix to ${r.tickets_updated} customers`);
                         void list.reload();
                       } catch (err) {

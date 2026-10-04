@@ -151,14 +151,29 @@ class TicketStore:
         ticket.pop("embedding", None)
         ticket["status_label"] = STATUSES.get(ticket["status"], ticket["status"])
         ticket.update(self.timeline(ticket_id))
+        for message in ticket["messages"]:
+            if message["author_role"] not in ("customer", "admin", "ai", "system"):
+                message["author_role"] = "admin"
+        for event in ticket["events"]:
+            if event["actor_role"] not in ("customer", "admin", "ai", "system"):
+                event["actor_role"] = "admin"
+        for step in ticket["steps"]:
+            if step["origin"] not in ("ai", "admin"):
+                step["origin"] = "admin"
+        for source in ticket.get("sources") or []:
+            if source.get("audience") != "customer":
+                source["audience"] = "admin"
         with self.db.read() as con:
             owner = con.execute(sa.select(users.c.email, users.c.name).where(users.c.id == ticket["owner_id"])).first()
-            assignee = (con.execute(sa.select(users.c.email, users.c.name).where(users.c.id == ticket["assignee_id"]))
+            assignee = (con.execute(sa.select(users.c.email, users.c.name).where(
+                users.c.id == ticket["assignee_id"], users.c.role == "admin"))
                         .first() if ticket.get("assignee_id") else None)
             incident = (con.execute(sa.select(incidents).where(incidents.c.id == ticket["incident_id"])).first()
                         if ticket.get("incident_id") else None)
         ticket["customer"] = {"email": owner.email, "name": owner.name} if owner else None
         ticket["assignee"] = {"email": assignee.email, "name": assignee.name} if assignee else None
+        if not assignee:
+            ticket["assignee_id"] = None
         incident_data = row_dict(incident) if incident else None
         if incident_data:
             incident_data.pop("centroid", None)
@@ -167,7 +182,7 @@ class TicketStore:
 
     @staticmethod
     def customer_view(ticket: dict) -> dict:
-        """What the customer may see: no agent steps, internal notes or private source text."""
+        """What the customer may see: no admin steps, internal notes or private source text."""
         triage = ticket.get("triage") or {}
         decision = ticket.get("decision") or {}
         visible_steps = [s for s in ticket.get("steps", []) if s.get("customer_visible")]
@@ -184,7 +199,7 @@ class TicketStore:
                     evidence.append({"id": citation, "kind": "guide", "title": source.get("title") or "Support guide",
                                      "excerpt": source.get("snippet") or ""})
                 elif source.get("kind") == "ticket":
-                    # Historical tickets may contain another customer's details or agent-only actions.
+                    # Historical tickets may contain another customer's details or admin-only actions.
                     evidence.append({"id": citation, "kind": "case", "title": "Past resolved support case"})
             return evidence
 
