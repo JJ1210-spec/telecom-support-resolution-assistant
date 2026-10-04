@@ -167,11 +167,27 @@ class TicketStore:
 
     @staticmethod
     def customer_view(ticket: dict) -> dict:
-        """What the customer may see: no agent steps, internal notes, raw sources or model internals."""
+        """What the customer may see: no agent steps, internal notes or private source text."""
         triage = ticket.get("triage") or {}
         decision = ticket.get("decision") or {}
         visible_steps = [s for s in ticket.get("steps", []) if s.get("customer_visible")]
         latest_plan = max((s["plan_version"] for s in visible_steps), default=0)
+        sources = {s["id"]: s for s in ticket.get("sources") or [] if s.get("id")}
+
+        def public_evidence(step: dict) -> list[dict]:
+            evidence = []
+            for citation in dict.fromkeys(step.get("citations") or []):
+                source = sources.get(citation)
+                if not source:
+                    continue
+                if source.get("kind") == "kb" and source.get("audience") == "customer":
+                    evidence.append({"id": citation, "kind": "guide", "title": source.get("title") or "Support guide",
+                                     "excerpt": source.get("snippet") or ""})
+                elif source.get("kind") == "ticket":
+                    # Historical tickets may contain another customer's details or agent-only actions.
+                    evidence.append({"id": citation, "kind": "case", "title": "Past resolved support case"})
+            return evidence
+
         return {
             "id": ticket["id"], "subject": ticket["subject"], "complaint": ticket["complaint"],
             "status": ticket["status"], "status_label": ticket["status_label"], "route": ticket.get("route"),
@@ -182,8 +198,8 @@ class TicketStore:
                       "product": triage.get("product")} if triage else None,
             "why": decision.get("customer_reason"), "recurrence": decision.get("recurrence"),
             "sla_due_at": ticket.get("sla_due_at"),
-            "steps": [{k: s[k] for k in ("id", "position", "text", "detail", "status", "status_note", "origin",
-                                         "citations", "plan_version")}
+            "steps": [{**{k: s[k] for k in ("id", "position", "text", "detail", "status", "status_note", "origin",
+                                              "citations", "plan_version")}, "evidence": public_evidence(s)}
                       for s in visible_steps if s["plan_version"] == latest_plan],
             "messages": [{k: m[k] for k in ("id", "author_role", "body", "options", "answered_option", "step_id",
                                             "created_at")}

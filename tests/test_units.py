@@ -18,6 +18,7 @@ from telecom_assistant.insights.discovery import agglomerate
 from telecom_assistant.insights.drift import psi
 from telecom_assistant.knowledge.retrieval import RetrievalResult, knn_votes, recurrence
 from telecom_assistant.pii import redact
+from telecom_assistant.tickets.store import TicketStore
 
 BANK = {q["id"]: q for q in load_bank()}
 BB = ["connectivity.intermittent_drop", "connectivity.slow_speed", "wifi.coverage_or_interference",
@@ -67,6 +68,31 @@ def test_citation_validation_enforces_grounding_and_customer_gate():
     assert not any("refund" in t for t in agent_texts)
     assert out["probable_root_cause"] is None and out["customer_message"] == ""
     assert out["citation_validity"] == 1.0 and warnings
+
+
+def test_customer_step_evidence_exposes_only_safe_source_details():
+    ticket = {
+        "id": "T-NEW", "subject": "Connection drops", "complaint": "It drops at night",
+        "status": "self_service", "status_label": "Try these steps", "created_at": "now", "updated_at": "now",
+        "steps": [{"id": "step-1", "position": 1, "text": "Check the router light", "detail": "",
+                   "status": "pending", "status_note": None, "origin": "ai", "plan_version": 1,
+                   "customer_visible": True, "citations": ["KB-1#h1", "KB-1#c1", "T-PAST"]}],
+        "sources": [
+            {"id": "KB-1#h1", "kind": "kb", "audience": "customer", "title": "Router guide",
+             "snippet": "Check the router light."},
+            {"id": "KB-1#c1", "kind": "kb", "audience": "agent", "title": "Router guide",
+             "snippet": "Private line test instructions"},
+            {"id": "T-PAST", "kind": "ticket", "title": "Another customer's complaint",
+             "snippet": "Private customer details and agent actions"},
+        ],
+    }
+    view = TicketStore.customer_view(ticket)
+    evidence = view["steps"][0]["evidence"]
+    assert evidence == [
+        {"id": "KB-1#h1", "kind": "guide", "title": "Router guide", "excerpt": "Check the router light."},
+        {"id": "T-PAST", "kind": "case", "title": "Past resolved support case"},
+    ]
+    assert "Private" not in str(view)
 
 
 def _retrieval(sim: float, intent: str, n: int) -> RetrievalResult:

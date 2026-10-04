@@ -175,10 +175,13 @@ class SupportDesk:
         degraded += draft_meta.get("degraded", [])
         decision = route(self.s.settings, triage, retrieval, draft, self.s.registry.by_intent(), intake)
         decision["customer_reason"] = CUSTOMER_REASON[decision["route"]].format(n=decision["recurrence"])
+        cited_ids = {citation for step in (draft or {}).get("customer_steps", []) +
+                     (draft or {}).get("agent_steps", []) for citation in step.get("citations", [])}
+        all_sources = list(dict((s["id"], s) for s in sources + retrieval.tickets).values())
         compact_sources = [{k: s.get(k) for k in ("id", "kind", "title", "snippet", "similarity", "rerank", "rrf",
                                                   "intent", "product", "audience", "root_cause", "steps", "origin",
                                                   "outcome_score", "resolved_at", "section", "kb_id")}
-                           for s in (sources + [t for t in retrieval.tickets if t not in sources])][:16]
+                           for i, s in enumerate(all_sources) if i < 16 or s["id"] in cited_ids]
         latency = {**timer.marks, "total": timer.total(), "retrieval_detail": retrieval.latency_ms}
         models = {"triage": triage_meta.get("model"), "draft": draft_meta.get("model"),
                   "embed": getattr(self.s.embedder, "model", None),

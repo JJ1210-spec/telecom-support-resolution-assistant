@@ -90,6 +90,8 @@ def test_full_lifecycle(client, services, fake_llm):
     # every AI customer step is grounded in a self-help section; the fabricated one was dropped
     assert ticket["steps"], "expected grounded customer steps"
     assert all(any("#h" in c for c in s["citations"]) for s in ticket["steps"])
+    assert all(any(e["kind"] == "guide" and e["id"] in s["citations"] for e in s["evidence"])
+               for s in ticket["steps"])
     assert not any(s["text"] == "Unsupported step" for s in ticket["steps"])
 
     # side chat on a step, then mark every step as not working -> escalated with history

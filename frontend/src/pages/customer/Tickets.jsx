@@ -389,7 +389,14 @@ function StepsTab({ ticket: t, busy, open, anyWorked, onStatus, onChat, onSolved
       )}
       {t.steps.length > 0 && (
         <>
-          <p className="caption">Tick each step as you try it. Stuck? Use “Ask about this step”.</p>
+          <div className="step-intro">
+            <strong>{t.steps[0]?.origin === "agent" ? "Steps from your specialist" : "Suggested steps for your issue"}</strong>
+            <p className="caption">
+              Try each step, then tell us whether it worked. {t.steps[0]?.origin === "ai" &&
+                "The sources under each suggestion show what supports it. "}
+              Stuck? Use “Ask about this step”.
+            </p>
+          </div>
           <div>
             {t.steps.map((s) => (
               <StepRow
@@ -422,6 +429,7 @@ function StepsTab({ ticket: t, busy, open, anyWorked, onStatus, onChat, onSolved
   );
 }
 function StepRow({ step, disabled, chatCount, onStatus, onChat }) {
+  const evidence = step.evidence ?? [];
   return (
     <div className={`step ${step.status}`}>
       <span className="step-num">
@@ -436,6 +444,24 @@ function StepRow({ step, disabled, chatCount, onStatus, onChat }) {
       <div className="stack-sm">
         <div style={{ fontWeight: 500 }}>{step.text}</div>
         {step.detail && <div className="muted body-sm">{step.detail}</div>}
+        {step.origin === "ai" && evidence.length > 0 && (
+          <div className="step-evidence">
+            <div className="step-evidence-title">Sources for this step</div>
+            <ul>
+              {evidence.map((source) => (
+                <li key={source.id}>
+                  <span className="step-source-type">{source.kind === "guide" ? "Support guide" : "Past resolved case"}</span>
+                  <strong>{source.title}</strong>
+                  <span className="step-source-id">{source.id}</span>
+                  {source.excerpt && <p>{source.excerpt}</p>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {step.origin === "ai" && evidence.length === 0 && (
+          <p className="caption">Source details are unavailable for this step. Ask a specialist if you need more context.</p>
+        )}
         <div className="row" style={{ marginTop: 4 }}>
           <div className="seg" role="group" aria-label="Did this step work?">
             <button
