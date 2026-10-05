@@ -7,6 +7,7 @@ on:
 jobs:
   live:
     runs-on: ubuntu-latest
+    timeout-minutes: 180
     env:
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
@@ -22,10 +23,23 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.12", cache: pip }
+      - name: Validate required Actions secrets
+        run: |
+          missing=()
+          for name in GEMINI_API_KEY GROQ_API_KEY JINA_API_KEY QDRANT_URL QDRANT_API_KEY DATABASE_URL UPSTASH_REDIS_REST_URL UPSTASH_REDIS_REST_TOKEN; do
+            if [[ -z "${!name}" ]]; then
+              missing+=("$name")
+            fi
+          done
+          if (( ${#missing[@]} )); then
+            printf '::error::Missing Actions secrets: %s\n' "${missing[*]}"
+            exit 1
+          fi
       - run: pip install -e .
       - run: python -m telecom_assistant.cli check-keys
       - run: python -m telecom_assistant.cli eval --concurrency 1
       - run: python -m telecom_assistant.cli drift
       - run: python -m telecom_assistant.cli discover
       - uses: actions/upload-artifact@v4
+        if: always()
         with: { name: eval-report, path: reports/ }

@@ -87,7 +87,10 @@ GitHub using the `Dockerfile` and `render.yaml` in this repo.
   repository secrets: GitHub repo → **Settings** → **Secrets and variables** → **Actions** →
   **New repository secret**. Add `GEMINI_API_KEY`, `GROQ_API_KEY`, `JINA_API_KEY`, `QDRANT_URL`,
   `QDRANT_API_KEY`, `DATABASE_URL`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` (and optionally the two
-  Langfuse keys). If the cluster does pause, resume it in the Qdrant Cloud console.
+  Langfuse keys). The workflow now fails at **Validate required Actions secrets** and names missing keys before
+  running the evaluator. Confirm the names with `gh secret list`, then use **Actions → nightly → Run workflow**
+  to verify a fresh evaluation appears in **System health → Evaluation**. Repository privacy does not need to change.
+  If the cluster does pause, resume it in the Qdrant Cloud console.
 - **Free LLM quotas:** about 1,000 requests a day per model and 15–30 per minute. Fine for demos. The **System
   health** page shows the meters.
 - **CI:** every push runs tests and the frontend build on GitHub Actions (`.github/workflows/ci.yml`).
