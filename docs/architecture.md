@@ -193,10 +193,20 @@ different model from the generator, check that each step is supported by its sou
 |---|---|---|
 | `self_service` | P3/P4 · triage confidence ≥ 0.62 · ≥ 3 strongly similar resolved cases (recurrence) · ≥ 1 grounded self-help step · not sensitive | Steps immediately; ticket live until they confirm |
 | `assisted` | No blocker, but P2, lower confidence, rarer, or churn risk | Safe steps **and** an admin reviews |
-| `human` | Any blocker: P1 · sensitive intent (billing dispute, identity, porting, fiber LOS) · unknown class · prompt injection · abstention · no LLM · "something else" | No AI steps; admin gets a copilot brief |
+| `human` | Any blocker: P1 · sensitive intent (billing dispute, identity, porting, fiber LOS) · unknown class · prompt injection · abstention · no LLM · "something else" | Admin owns the fix and gets a copilot brief. When a matching, reviewed public KB section exists, the customer may see up to two read-only precautions; otherwise no AI steps appear. |
 
 Every decision stores its reasons, recurrence count, decision confidence and top similarity. Admins see these
 values, and the customer sees a plain-language "why".
+
+For admin-owned cases, the draft AI may nominate precaution source IDs. Code accepts only a short list of
+reviewed, read-only customer KB sections whose published text still matches the checked-in text and whose intent
+matches the complaint. It shows the canonical KB wording with citations, not newly generated instructions.
+Unclassified, low-similarity, injection-like, abstained and LLM-unavailable cases get no such steps. The UI does
+not present precaution outcomes as a self-service resolution.
+
+An intake relevance check for text unrelated to a service complaint is a recommended next step: ask the customer
+for the affected service and observable symptom before submission, but allow them to continue to an admin so a
+misclassification never discards a real or urgent issue. That check is not implemented in the current intake.
 
 ### 4.5 Severity
 The LLM applies the written P1–P4 rubric. Deterministic rules then raise severity where needed:
@@ -275,7 +285,7 @@ An embedding-model change is a blue/green rebuild into new Qdrant collections, f
 |---|---|---|
 | Traffic | < 1 RPS | Stateless API behind a load balancer with HPA; SSE fan-out moves from the in-process bus to Redis pub/sub |
 | LLM | Gemini/Groq free RPD (≈1k/day each) | Paid Gemini or Claude (`anthropic:` adapter exists); prompt caching for the static system prompt and taxonomy; severity-aware model routing |
-| Vectors | 200 tickets / 129 KB sections | 5–10M tickets: Qdrant sharding, replication factor 2, int8 quantisation (≈10 GB), payload indexes on filter fields (already created) |
+| Vectors | 264 resolved seed tickets / sectioned KB | 5–10M tickets: Qdrant sharding, replication factor 2, int8 quantisation (≈10 GB), payload indexes on filter fields (already created) |
 | Ingestion | Synchronous upsert + outbox | QStash push today; Kafka/Redpanda beyond ~1k events/s; same idempotent indexer |
 | DB | Neon free | Partition `traces` and `ticket_events` by month; retention 90 days; read replicas for the console |
 | Cost control | Quota meters + caches | Response cache keyed on redacted text + taxonomy version; embedding hash cache; batch summarisation |
@@ -286,8 +296,8 @@ An embedding-model change is a blue/green rebuild into new Qdrant collections, f
    deterministic, explainable (bits gained are shown to the customer and the admin), testable with an oracle
    customer in the eval, and extensible without code.
 2. **Three routes instead of a binary auto/escalate split.** The `assisted` route keeps P2 and borderline
-   cases moving: the customer can often fix it while a human is already looking, and safety-critical cases never
-   get AI steps.
+   cases moving: the customer can often fix it while an admin is already looking. Admin-owned cases may show only
+   reviewed, read-only KB precautions when the evidence is strong enough.
 3. **Customer steps may cite only self-help sections.** The model cannot be trusted to tell admin-only actions
    (provisioning, line tests) from customer-safe ones. The KB says which is which, and code enforces it.
 4. **Postgres as the system of record, Qdrant as derived data.** Every vector can be rebuilt from the database

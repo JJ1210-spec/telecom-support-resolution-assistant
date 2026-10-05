@@ -59,6 +59,12 @@ GitHub using the `Dockerfile` and `render.yaml` in this repo.
 - **It sleeps after 15 minutes without traffic.** The first visit after that takes about 50 seconds to wake up.
   Before a demo or interview, open the site a minute early.
 - Every push to the deployed branch redeploys automatically.
+- Pushing new synthetic corpus files does not automatically add those rows to an existing hosted database. From a
+  trusted environment with the hosted `DATABASE_URL`, `QDRANT_URL`, `QDRANT_API_KEY` and embedding credentials,
+  run `.venv/Scripts/python -m telecom_assistant.cli seed` once after the deployment. The importer is idempotent;
+  it stores unresolved rows but indexes only resolved rows as solution evidence. For the current corpus, its source
+  files contain 264 resolved tickets, 132 unresolved tickets and 22 KB articles. Run
+  `.venv/Scripts/python scripts/validate_telecom_dataset.py` before the import.
 - Logs are under **Logs** in the Render dashboard.
 
 ---
@@ -89,8 +95,9 @@ GitHub using the `Dockerfile` and `render.yaml` in this repo.
 ## Roll back a deployment
 
 The previous working code is preserved at Git tag `rollback/admin-only-base-20261004` (commit `00ec8a0`).
-This update changes application code and documentation only; it does not migrate or delete database records or
-change the hosted vector collections. The previous code can therefore use the same hosted data.
+Application rollback does not remove newly seeded corpus rows, KB sections or taxonomy classes from the hosted
+database and vector collections. The previous code can read the same hosted data, but restoring the exact old
+dataset requires a separate, reviewed data restore or targeted removal of the newly added synthetic IDs.
 
 If a deployment fails, open the Render service's **Events** page and use **Rollback** on the last successful
 deployment. If that deployment is no longer listed, use **Manual Deploy → Deploy a specific commit** and enter

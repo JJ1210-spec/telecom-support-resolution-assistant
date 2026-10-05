@@ -167,12 +167,15 @@ def test_indexing_is_idempotent_and_versioned(services):
 def test_kb_deprecation_is_immediate(services):
     before = asyncio.run(services.retriever.search("TV picture pixelating set-top box", top_kb=10))
     assert any(s["kb_id"] == "KB-TV-PIXEL" for s in before.kb)
-    from telecom_assistant.seed import kb_records
+    from telecom_assistant.seed import bootstrap, kb_records
 
     article = next(a for a in kb_records() if a["kb_id"] == "KB-TV-PIXEL")
     assert asyncio.run(services.indexer.upsert_kb({**article, "version": 2, "status": "deprecated"})) == "status_changed"
     after = asyncio.run(services.retriever.search("TV picture pixelating set-top box", top_kb=10))
     assert not any(s["kb_id"] == "KB-TV-PIXEL" for s in after.kb)
+    assert asyncio.run(bootstrap(services))["kb"]["skipped_newer"] >= 1
+    after_reseed = asyncio.run(services.retriever.search("TV picture pixelating set-top box", top_kb=10))
+    assert not any(s["kb_id"] == "KB-TV-PIXEL" for s in after_reseed.kb)
 
 
 def test_discovery_pool_shows_full_redacted_complaints(services):

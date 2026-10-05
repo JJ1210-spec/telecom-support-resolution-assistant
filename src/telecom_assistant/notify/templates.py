@@ -66,7 +66,8 @@ def render(template: str, ctx: dict) -> tuple[str, str, str]:
                           'Meanwhile, a few safe checks are waiting in your ticket.</p>')
         else:
             blocks.append('<p style="font-size:15px;line-height:1.5">A support admin will review your ticket '
-                          'and reply in the portal.</p>')
+                          'and reply in the portal. If safe checks are available, you can see them there while '
+                          'the admin handles the fix.</p>')
         text = f"We've received ticket {ticket}. Track it here: {url}"
         return subject, _layout("We've got your request", intro, blocks, ("View your ticket", url), footer), text
     if template == "incident_linked":

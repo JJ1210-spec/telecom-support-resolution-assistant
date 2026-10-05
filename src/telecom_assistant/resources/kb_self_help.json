@@ -49,7 +49,8 @@
   "KB-SIM-ACT": [
     "Restart the phone and wait up to 30 minutes after the activation message for the network to register the SIM.",
     "Remove and re-insert the SIM firmly, and check it in another phone if possible.",
-    "If it still shows no service, support will verify your identity through the secure process - never share your full ID number in chat."
+    "If it still shows no service, support will verify your identity through the secure process - never share your full ID number in chat.",
+    "Note the activation time and the exact no-service message; keep the SIM in place while an admin checks it."
   ],
   "KB-ESIM-QR": [
     "Check that your phone supports eSIM and is connected to Wi-Fi during the download.",
@@ -80,5 +81,35 @@
     "Note which channels are affected and whether it happens at particular times or in bad weather.",
     "Check that the cable between the set-top box and the wall/dish is firmly connected (do not climb to reach a dish).",
     "Restart the set-top box by switching it off at the wall for 30 seconds."
+  ],
+  "KB-BB-POWER": [
+    "Note whether the router power light is on and whether the adapter or cable looks damaged. Do not open the router.",
+    "If any equipment looks damaged or smells hot, avoid touching it and tell support right away.",
+    "Check the provider status page for a known service problem while an admin reviews the equipment."
+  ],
+  "KB-MOB-SMS-OUT": [
+    "Note the exact error shown when an SMS fails and the approximate time; do not include private message content.",
+    "Check whether you can receive a normal SMS and make a call; tell support which service works.",
+    "Confirm the recipient number and the phone's ordinary messaging settings before trying again."
+  ],
+  "KB-MOB-HOTSPOT": [
+    "Note whether websites load on the phone itself while mobile data is on.",
+    "Note whether the other device connects to the hotspot but cannot browse, or cannot connect at all.",
+    "Check whether your plan includes tethering before changing any hotspot settings."
+  ],
+  "KB-SIM-PIN": [
+    "Note the exact SIM lock or PUK message shown on the phone without sharing any codes.",
+    "Do not guess more PIN or PUK codes; repeated incorrect attempts may permanently block the SIM.",
+    "Ask an admin for the approved identity-verified recovery process."
+  ],
+  "KB-BILL-PLAN": [
+    "Keep the plan-change confirmation, requested plan name and effective date ready for the admin.",
+    "Do not submit the same plan change again while the first request is being checked.",
+    "Check which plan and billing period are shown in your account without changing settings."
+  ],
+  "KB-TV-AUDIO": [
+    "Note which channels have no sound and whether another TV input plays sound normally.",
+    "Check whether the TV or set-top box shows a mute indicator without changing other settings.",
+    "If it is safe to do so, check the ordinary audio output selection on the TV."
   ]
 }

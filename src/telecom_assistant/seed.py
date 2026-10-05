@@ -8,6 +8,7 @@ from importlib import resources
 from pathlib import Path
 
 from .config import ROOT
+from .knowledge.indexer import StaleVersion
 from .services import Services
 
 DATA = ROOT / "data" / "synthetic" / "v1"
@@ -34,9 +35,13 @@ def kb_records() -> list[dict]:
 async def bootstrap(services: Services) -> dict:
     added = services.registry.seed()
     await services.indexer.ensure()
-    kb = {"inserted": 0, "updated": 0, "unchanged": 0, "status_changed": 0}
+    kb = {"inserted": 0, "updated": 0, "unchanged": 0, "status_changed": 0, "skipped_newer": 0}
     for article in kb_records():
-        kb[await services.indexer.upsert_kb(article, actor="seed")] += 1
+        try:
+            kb[await services.indexer.upsert_kb(article, actor="seed")] += 1
+        except StaleVersion:
+            # A newer published or deprecated KB version must not be reset by an older seed file.
+            kb["skipped_newer"] += 1
     resolved = await services.indexer.index_tickets(read_jsonl("resolved_tickets.jsonl"))
     unresolved = await services.indexer.index_tickets(read_jsonl("unresolved_tickets.jsonl"))
     return {"taxonomy_added": added, "kb": kb, "resolved": resolved.as_dict(), "unresolved": unresolved.as_dict(),

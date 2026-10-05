@@ -371,7 +371,10 @@ export default function AdminTicket() {
 
           {workTab === "steps" && (
             <div className="panel-body stack">
-              <div className="eyebrow">Customer step outcomes</div>
+              <div className="eyebrow">
+                {t.route === "human" && customerSteps.some((step) => step.origin === "ai") ?
+                  "Customer precautions and step outcomes" : "Customer step outcomes"}
+              </div>
               {customerSteps.length === 0 && <p className="caption">No steps were shown to the customer.</p>}
               {customerSteps.map((s) => (
                 <div key={s.id} style={{ borderBottom: "1px solid var(--hairline-soft)", paddingBottom: 12 }}>
@@ -382,7 +385,7 @@ export default function AdminTicket() {
                     <span
                       className={`badge ${s.status === "worked" ? "badge-green" : s.status === "did_not_work" ? "badge-red" : ""}`}
                     >
-                      {s.status.replace(/_/g, " ")}
+                      {t.route === "human" && s.origin === "ai" ? "Information only" : s.status.replace(/_/g, " ")}
                     </span>
                   </div>
                   {s.status_note && <div className="caption">“{s.status_note}”</div>}

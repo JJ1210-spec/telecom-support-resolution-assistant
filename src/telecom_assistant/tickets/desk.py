@@ -9,8 +9,8 @@ Flow for a new ticket
    citation validation -> routing decision -> incident radar -> discovery pool -> trace.
 4. self_service / assisted: customer gets a checklist of grounded steps with "worked / didn't work" and a
    per-step chat. All steps failing (or asking for a human) escalates the same ticket with the attempt log.
-5. human: admins get a copilot brief (similar incidents, root causes, next actions excluding what failed,
-   clarifying questions with quick-reply options, reply draft).
+5. human: admins own the fix and get a copilot brief. If a reviewed public KB supports it, the customer
+   also gets up to two read-only precautions while waiting, never an admin diagnostic action.
 6. Admin replies / asks for info with quick-reply options / proposes a solution; the customer confirms or
    reopens. The ticket stays live until confirmed.
 7. Resolved -> outbox "learn": the whole process is summarized, indexed as a new searchable case, and a KB
@@ -28,7 +28,7 @@ from datetime import UTC, datetime
 import sqlalchemy as sa
 
 from ..ai.clarify import ClarifyEngine
-from ..ai.resolver import route
+from ..ai.resolver import route, select_precaution_steps
 from ..db import corpus_tickets, kb_articles, tickets, traces, users, utc_now, vec_to_bytes
 from ..knowledge.retrieval import knn_votes
 from ..notify.outbox import enqueue, refresh_pending
@@ -53,6 +53,8 @@ CUSTOMER_REASON = {
     "assisted": "An admin is reviewing your ticket. Meanwhile, these safe checks may fix it faster.",
     "human": "This needs an admin, so we've sent it straight to our support team.",
 }
+HUMAN_PRECAUTION_REASON = ("An admin needs to investigate and handle the fix. "
+                           "While they review your ticket, these safe checks can help without changing your service.")
 
 
 class SupportDesk:
@@ -175,8 +177,16 @@ class SupportDesk:
         degraded += draft_meta.get("degraded", [])
         decision = route(self.s.settings, triage, retrieval, draft, self.s.registry.by_intent(), intake)
         decision["customer_reason"] = CUSTOMER_REASON[decision["route"]].format(n=decision["recurrence"])
+        if (decision["route"] == "human" and draft and triage.get("intent") != "other"
+                and not triage.get("prompt_injection") and triage.get("confidence", 0) >= 0.5
+                and retrieval.top_similarity >= self.s.settings.min_retrieval_score
+                and not (intake or {}).get("chose_other")):
+            draft["precaution_steps"] = select_precaution_steps(draft, sources, triage.get("intent"))
+            if draft["precaution_steps"]:
+                decision["customer_reason"] = HUMAN_PRECAUTION_REASON
         cited_ids = {citation for step in (draft or {}).get("customer_steps", []) +
-                     (draft or {}).get("admin_steps", []) for citation in step.get("citations", [])}
+                     (draft or {}).get("admin_steps", []) + (draft or {}).get("precaution_steps", [])
+                     for citation in step.get("citations", [])}
         all_sources = list(dict((s["id"], s) for s in sources + retrieval.tickets).values())
         compact_sources = [{k: s.get(k) for k in ("id", "kind", "title", "snippet", "similarity", "rerank", "rrf",
                                                   "intent", "product", "audience", "root_cause", "steps", "origin",
@@ -269,7 +279,8 @@ class SupportDesk:
         triage, decision, draft = result["triage"], result["decision"], result["draft"] or {}
         vector = as_vector(result.get("query_vector"))
         route_name = decision["route"]
-        customer_steps = draft.get("customer_steps", []) if route_name in ("self_service", "assisted") else []
+        customer_steps = (draft.get("precaution_steps", []) if route_name == "human"
+                          else draft.get("customer_steps", []))
         admin_steps = draft.get("admin_steps", [])
         status = "self_service" if route_name == "self_service" else "escalated"
         created_at = datetime.fromisoformat(ticket["created_at"]) if ticket.get("created_at") else None
@@ -303,7 +314,7 @@ class SupportDesk:
                                  {"route": route_name, "intent": triage.get("intent_label"),
                                   "severity": triage["severity"], "trace_id": result["trace_id"]})
                 body = decision["customer_reason"]
-                if customer_steps and draft.get("customer_message"):
+                if customer_steps and route_name != "human" and draft.get("customer_message"):
                     body = f"{body}\n\n{draft['customer_message']}"
                 self.store.add_message(con, ticket_id, "ai", "ai", body)
                 if ack_id:
@@ -364,6 +375,8 @@ class SupportDesk:
         step = next((s for s in ticket["steps"] if s["id"] == step_id and s["customer_visible"]), None)
         if not step:
             raise NotFound(step_id)
+        if ticket.get("route") == "human" and step.get("origin") == "ai":
+            raise InvalidTransition("These are information-only checks while an admin handles the fix")
         if ticket["status"] not in OPEN:
             raise InvalidTransition("This ticket is no longer open")
         escalate = False
@@ -423,8 +436,12 @@ class SupportDesk:
         await asyncio.to_thread(_q)
         source_text = "\n".join(s.get("snippet") or "" for s in (ticket.get("sources") or [])
                                 if s["id"] in (step.get("citations") or []))
-        answer = await self.s.step_chat.reply(step, source_text, history, redacted,
-                                              (ticket.get("triage") or {}).get("language") or "en", ticket["trace_id"])
+        if ticket.get("route") == "human" and step.get("origin") == "ai":
+            answer = {"reply": "An admin is handling the fix. Please share any observations in the ticket conversation.",
+                      "needs_human": True}
+        else:
+            answer = await self.s.step_chat.reply(step, source_text, history, redacted,
+                                                  (ticket.get("triage") or {}).get("language") or "en", ticket["trace_id"])
         escalate = answer["needs_human"] and ticket["status"] == "self_service"
 
         def _a() -> None:

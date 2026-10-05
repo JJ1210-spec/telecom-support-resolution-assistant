@@ -21,8 +21,8 @@ confirmed resolution to the knowledge base.
 | | Customer | Admin |
 |---|---|---|
 | **Intake** | Swiggy-style chips (area → issue → "something else"), then 0-3 adaptive questions picked by **expected information gain**, with a live "what we think it is" panel | Sees every answer and how many bits of uncertainty it removed |
-| **Routing** | Simple and recurring issues get steps right away. P2 and borderline issues get safe steps **and** an admin. P1, sensitive or unclear issues go straight to a human. | Each decision lists its reasons: recurrence, confidence, severity drivers, safety blockers |
-| **Steps** | Checklist with **Tried - worked / Tried - didn't work** and a **side chat for each step**. All steps failing escalates automatically. | Sees each step's outcome, notes and step chat. Outcomes re-weight retrieval and feed solution-drift alerts. |
+| **Routing** | Simple and recurring issues get steps right away. P2 and borderline issues get safe steps **and** an admin. P1 and sensitive issues stay with an admin; when evidence supports it, customers see up to two read-only precautions from reviewed public KB sections. Unclear cases stay with an admin without invented steps. | Each decision lists its reasons: recurrence, confidence, severity drivers, safety blockers |
+| **Steps** | Fix steps have **Tried - worked / Tried - didn't work** and a **side chat for each step**. All self-service steps failing escalates automatically. Admin-owned tickets may show read-only, cited precautions without fix feedback. | Sees each fix step's outcome, notes and step chat. Outcomes re-weight retrieval and feed solution-drift alerts. |
 | **Conversation** | Thread with **quick-reply choices** when support asks a question | Ask for info with options, reply, add internal notes, propose a fix, resolve with a note |
 | **Lifecycle** | Ticket stays live; "still not working" **reopens the same ticket**; rate the support | Queue sorted by severity and SLA; claim; **copilot** shows similar incidents, root causes, next actions (excluding what failed), questions and a reply draft |
 | **Email** | Acknowledgement in seconds, then updates at every step | Notification microservice: transactional outbox, QStash, idempotent sends, DLQ replay, rendered email preview |
@@ -73,7 +73,7 @@ or Groq). Without one, tickets still save and go to a human.
 
 ## Evaluation and system health
 
-`telecom-assistant eval` runs the 56 held-out cases (never indexed) through the real pipeline. It writes
+`telecom-assistant eval` runs the 74 held-out cases (never indexed) through the real pipeline. It writes
 `reports/eval_<timestamp>.{md,json}` and stores the run, which the admin **System health → Evaluation** tab
 displays. It reports:
 
@@ -84,7 +84,9 @@ displays. It reports:
 - citation validity and LLM-judged step support;
 - per-stage latency and degraded-mode rates.
 
-### Latest results ([`reports/eval_20261003_195637.md`](reports/eval_20261003_195637.md), hosted stack, English synthetic held-out set)
+### Previous evaluation ([`reports/eval_20261003_195637.md`](reports/eval_20261003_195637.md), hosted stack, 56-case English synthetic held-out set)
+
+These numbers predate the 22-family, 74-case corpus. Re-run the evaluation before making accuracy claims about the expanded data.
 
 | Metric | Result | Target |
 |---|---|---|
@@ -115,7 +117,7 @@ At runtime:
 ## Tests
 
 ```bash
-.venv/Scripts/python -m pytest -q          # 30 tests, no network: fake LLM, hash embedder, local index, SQLite
+.venv/Scripts/python -m pytest -q          # no network: fake LLM, hash embedder, local index, SQLite
 .venv/Scripts/python -m ruff check src tests
 cd frontend && npm run build
 ```
@@ -142,7 +144,11 @@ docs/             architecture, phase records, issues log
 ```
 
 ## Data and privacy
-The data is original synthetic telecom data (see `data/synthetic/v1/README.md`). Complaints are PII-redacted
+The current synthetic corpus has 264 resolved and 132 unresolved tickets across 22 English-language issue families (see `data/synthetic/v1/README.md`). Only verified resolved cases enter the resolution index. Complaints are PII-redacted
 before any LLM, embedding, trace or log call. Free-tier providers may use submitted data, so real customer data
 must not be used without paid, no-training agreements. Never share passwords, OTPs or full card numbers in
 tickets.
+
+### Suggested intake guard for irrelevant complaints
+
+A future pre-submission relevance check should classify the description as a service issue, unclear request, or clearly unrelated text. For unclear or unrelated text, ask for the affected service, observable symptom, and when it started, then let the customer revise or continue to an admin. Never silently discard a plausible complaint or let an unverified one become resolution evidence. Keep emergency and accessibility reports on a direct admin path. This guard is a recommendation; the current intake still accepts free text and uses adaptive questions plus conservative routing.

@@ -2,10 +2,10 @@
   "generator_seed": 20261002,
   "origin": "Original synthetic telecom data. The Tobi-Bueck dataset informed field structure only; no rows were copied.",
   "counts": {
-    "resolved_tickets": 192,
-    "unresolved_tickets": 96,
-    "kb_articles": 16,
-    "eval_cases": 56,
+    "resolved_tickets": 264,
+    "unresolved_tickets": 132,
+    "kb_articles": 22,
+    "eval_cases": 74,
     "update_events": 5
   },
   "intents": {
@@ -72,15 +72,39 @@
     "tv.picture_breakup": {
       "product": "TV",
       "kb_id": "KB-TV-PIXEL"
+    },
+    "connectivity.router_no_power": {
+      "product": "Home Broadband",
+      "kb_id": "KB-BB-POWER"
+    },
+    "mobile.sms_send_failed": {
+      "product": "Mobile Prepaid",
+      "kb_id": "KB-MOB-SMS-OUT"
+    },
+    "mobile.hotspot_unavailable": {
+      "product": "Mobile Prepaid",
+      "kb_id": "KB-MOB-HOTSPOT"
+    },
+    "sim.pin_locked": {
+      "product": "Mobile Prepaid",
+      "kb_id": "KB-SIM-PIN"
+    },
+    "billing.plan_change_missing": {
+      "product": "Billing Account",
+      "kb_id": "KB-BILL-PLAN"
+    },
+    "tv.audio_missing": {
+      "product": "TV",
+      "kb_id": "KB-TV-AUDIO"
     }
   },
   "languages_resolved": {
-    "en": 192
+    "en": 264
   },
   "languages_unresolved": {
-    "en": 96
+    "en": 132
   },
   "languages_eval": {
-    "en": 56
+    "en": 74
   }
 }

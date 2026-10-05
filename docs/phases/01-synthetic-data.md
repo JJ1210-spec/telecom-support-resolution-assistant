@@ -2,7 +2,7 @@
 
 ## What was completed
 
-Created a deterministic, original synthetic data generator and five JSONL outputs: resolved tickets, unresolved tickets, KB articles, a held-out evaluation set and update events. The data covers 16 telecom issue families with English complaints, paraphrases, missing optional fields, typos, abbreviations, ambiguous cases and prompt-injection text. Added a manifest and validation script.
+Created a deterministic, original synthetic data generator and five JSONL outputs: resolved tickets, unresolved tickets, KB articles, a held-out evaluation set and update events. The initial phase covered 16 telecom issue families with English complaints, paraphrases, missing optional fields, typos, abbreviations, ambiguous cases and prompt-injection text. Added a manifest and validation script. The current corpus has since expanded to 22 families; see `data/synthetic/v1/README.md` for current counts.
 
 ## Why these choices were made
 
@@ -12,9 +12,9 @@ JSONL preserves arrays of resolution steps and KB references without packing the
 
 ## Validation
 
-Ran `python scripts/generate_telecom_dataset.py` and `python scripts/validate_telecom_dataset.py` using the bundled Python runtime. Both completed successfully. The final output has 192 resolved tickets, 96 unresolved tickets, 16 KB articles, 56 evaluation cases and 5 update events. The validator checked unique IDs and complaint strings, source references, resolution data only on resolved cases, expected abstention on unknown cases, and no exact overlap between indexed complaints and evaluation complaints. It found 8 expected-abstention cases, 80 training tickets with a missing product hint, and 48 with a missing subject.
+At the time of Phase 1, `python scripts/generate_telecom_dataset.py` and `python scripts/validate_telecom_dataset.py` completed successfully. That baseline had 192 resolved tickets, 96 unresolved tickets, 16 KB articles, 56 evaluation cases and 5 update events. The validator checked unique IDs and complaint strings, source references, resolution data only on resolved cases, expected abstention on unknown cases, and no exact overlap between indexed complaints and evaluation complaints. It found 8 expected-abstention cases, 80 training tickets with a missing product hint, and 48 with a missing subject.
 
-All 288 indexed tickets and all 56 held-out cases are in English. Each issue has three held-out wordings (one reserved wording and two paraphrases) that never appear in the indexed corpus. A sample record from each file was inspected after generation. This is a structural and content spot-check, not an LLM-quality evaluation.
+All 288 initial training tickets and all 56 initial held-out cases were in English. Each issue has three held-out wordings (one reserved wording and two paraphrases) that never appear in the indexed corpus. A sample record from each file was inspected after generation. This is a structural and content spot-check, not an LLM-quality evaluation. The current files contain 264 resolved tickets, 132 unresolved tickets and 74 held-out cases, still English-only.
 
 ## Known limitations and next phase
 

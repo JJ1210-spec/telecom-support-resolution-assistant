@@ -71,7 +71,7 @@ flowchart LR
 ## 4. Each component in one paragraph
 
 **Adaptive questions (information gain), `ai/clarify.py`.**
-The engine keeps a probability for each of the 16 issue types. For every candidate question, it works out how
+The engine keeps a probability for each of the 22 seeded issue types. For every candidate question, it works out how
 much the question would reduce uncertainty on average (entropy before minus expected entropy after) and asks
 the best one. After each answer it updates the probabilities with Bayes' rule, and it stops at 80% confidence.
 The questions live in a JSON file, so adding one needs no code change. This step makes no LLM call: it is pure
@@ -160,7 +160,7 @@ If every model is down, the ticket is still saved and goes to a human; nothing i
 
 ## 6. Numbers to quote
 
-From `reports/eval_20261003_195637.md`: 56 held-out English test complaints (never indexed), synthetic data.
+From the earlier `reports/eval_20261003_195637.md`: 56 held-out English test complaints (never indexed), synthetic data. The current corpus has 74 held-out cases and has not yet had the same hosted evaluation rerun.
 
 | What | Result |
 |---|---|
@@ -279,7 +279,7 @@ Two levels:
 
 - **Tests:** a fake, deterministic LLM, a hash-based embedder and SQLite, so the 27 tests run offline in CI at
   zero cost.
-- **Evaluation:** a separate harness runs the real models on 56 held-out cases and reports accuracy, safety,
+- **Evaluation:** a separate harness runs the real models on 74 held-out cases and reports accuracy, safety,
   retrieval quality and latency.
 
 **Q: What would you do next?**

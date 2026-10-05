@@ -365,6 +365,7 @@ export function TicketDetail() {
   );
 }
 function StepsTab({ ticket: t, busy, open, anyWorked, onStatus, onChat, onSolved, onAdmin, onRate }) {
+  const precautionPlan = t.route === "human" && t.steps[0]?.origin === "ai";
   return (
     <div className="stack">
       {!open && (
@@ -390,11 +391,13 @@ function StepsTab({ ticket: t, busy, open, anyWorked, onStatus, onChat, onSolved
       {t.steps.length > 0 && (
         <>
           <div className="step-intro">
-            <strong>{t.steps[0]?.origin !== "ai" ? "Steps from your admin" : "Suggested steps for your issue"}</strong>
+            <strong>{precautionPlan ? "Safe checks while an admin reviews" :
+              t.steps[0]?.origin !== "ai" ? "Steps from your admin" : "Suggested steps for your issue"}</strong>
             <p className="caption">
-              Try each step, then tell us whether it worked. {t.steps[0]?.origin === "ai" &&
-                "The information under each suggestion explains what supports it. "}
-              Stuck? Use “Ask about this step”.
+              {precautionPlan ? "An admin will handle the fix. These checks only help you record useful information; they will not change your service." :
+                <>Try each step, then tell us whether it worked. {t.steps[0]?.origin === "ai" &&
+                  "The information under each suggestion explains what supports it. "}
+                  Stuck? Use “Ask about this step”.</>}
             </p>
           </div>
           <div>
@@ -402,6 +405,7 @@ function StepsTab({ ticket: t, busy, open, anyWorked, onStatus, onChat, onSolved
               <StepRow
                 key={s.id}
                 step={s}
+                precaution={precautionPlan && s.origin === "ai"}
                 disabled={busy || !open}
                 chatCount={t.messages.filter((m) => m.step_id === s.id).length}
                 onStatus={(status) => onStatus(s, status)}
@@ -409,7 +413,7 @@ function StepsTab({ ticket: t, busy, open, anyWorked, onStatus, onChat, onSolved
               />
             ))}
           </div>
-          {open && anyWorked && (
+          {open && anyWorked && !precautionPlan && (
             <div className="alert alert-info" style={{ alignItems: "center" }}>
               <Icon name="check" />
               <span className="grow">One of the steps worked. Is your issue completely solved?</span>
@@ -428,7 +432,7 @@ function StepsTab({ ticket: t, busy, open, anyWorked, onStatus, onChat, onSolved
     </div>
   );
 }
-function StepRow({ step, disabled, chatCount, onStatus, onChat }) {
+function StepRow({ step, precaution, disabled, chatCount, onStatus, onChat }) {
   const evidence = step.evidence ?? [];
   return (
     <div className={`step ${step.status}`}>
@@ -461,7 +465,7 @@ function StepRow({ step, disabled, chatCount, onStatus, onChat }) {
         {step.origin === "ai" && evidence.length === 0 && (
           <p className="caption">An admin can review the supporting information for this suggestion.</p>
         )}
-        <div className="row" style={{ marginTop: 4 }}>
+        {!precaution && <div className="row" style={{ marginTop: 4 }}>
           <div className="seg" role="group" aria-label="Did this step work?">
             <button
               className={step.status === "worked" ? "on-worked" : ""}
@@ -481,7 +485,7 @@ function StepRow({ step, disabled, chatCount, onStatus, onChat }) {
           <button className="btn btn-xs btn-outline" onClick={onChat}>
             <Icon name="chat" size={14} /> Ask about this step{chatCount ? ` (${chatCount})` : ""}
           </button>
-        </div>
+        </div>}
       </div>
     </div>
   );

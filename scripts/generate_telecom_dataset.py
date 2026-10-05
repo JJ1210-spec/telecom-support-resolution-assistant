@@ -164,6 +164,60 @@ ISSUES = [
         "kb_steps": ["Record channel pattern and signal reading", "Check accessible connections safely", "Escalate persistent weak signal"],
         "escalate": "Escalate if signal remains weak across multiple channels.",
     },
+    {
+        "key": "BB-POWER", "product": "Home Broadband", "intent": "connectivity.router_no_power",
+        "category": "Technical Support", "severity": "P1", "kb": "KB-BB-POWER",
+        "en": ["The broadband router has no power light and the connection is down", "My router will not turn on and there is no internet", "The router is completely dark even though other devices have power"],
+        "attempt": "I checked the wall switch without opening the router", "cause": "Router power supply or equipment fault",
+        "steps": ["Confirm the router power indicator and any visible damage", "Check the provider-approved power supply and equipment status", "Arrange a replacement or safe equipment inspection through the admin"],
+        "kb_steps": ["Record the router power-light state and any visible damage", "Use only provider-approved power equipment", "Escalate power faults for equipment inspection or replacement"],
+        "escalate": "Escalate immediately if the router has no power or any cable or adapter appears damaged.",
+    },
+    {
+        "key": "MOB-SMS-OUT", "product": "Mobile Prepaid", "intent": "mobile.sms_send_failed",
+        "category": "Technical Support", "severity": "P3", "kb": "KB-MOB-SMS-OUT",
+        "en": ["My phone receives texts but cannot send any SMS", "Outgoing text messages keep failing although I can receive them", "Every SMS I send shows a failed message"],
+        "attempt": "I checked the recipient number", "cause": "Outgoing SMS provisioning or device messaging configuration issue",
+        "steps": ["Record a failed send time and whether calls and incoming SMS work", "Check outgoing SMS entitlement and message-center configuration", "Escalate persistent send failures for an SMS trace"],
+        "kb_steps": ["Compare outgoing with incoming SMS", "Check messaging service settings and entitlement", "Escalate repeat send failures with example timestamps"],
+        "escalate": "Escalate if all recipients fail after basic device checks.",
+    },
+    {
+        "key": "MOB-HOTSPOT", "product": "Mobile Prepaid", "intent": "mobile.hotspot_unavailable",
+        "category": "Technical Support", "severity": "P3", "kb": "KB-MOB-HOTSPOT",
+        "en": ["My laptop connects to the phone hotspot but has no internet", "Mobile data works on my phone but tethered devices stay offline", "The personal hotspot is on yet my tablet cannot browse"],
+        "attempt": "I confirmed websites work on the phone itself", "cause": "Hotspot configuration or tethering entitlement issue",
+        "steps": ["Compare internet access on the phone and a connected device", "Check hotspot settings and plan entitlement", "Escalate if tethering is entitled but connected devices remain offline"],
+        "kb_steps": ["Check mobile data on the phone first", "Confirm hotspot and tethering entitlement", "Escalate persistent tethering failures"],
+        "escalate": "Escalate if mobile data works on the phone but tethering still fails after safe checks.",
+    },
+    {
+        "key": "SIM-PIN", "product": "Mobile Prepaid", "intent": "sim.pin_locked",
+        "category": "Account and Activation", "severity": "P2", "kb": "KB-SIM-PIN",
+        "en": ["My SIM says PUK required after wrong PIN attempts", "The phone says the SIM is locked and asks for a PUK code", "I cannot use the SIM because the PIN was entered incorrectly too many times"],
+        "attempt": "I stopped trying codes when the warning appeared", "cause": "SIM security lock requiring identity-verified recovery",
+        "steps": ["Confirm the exact lock message without requesting the customer's codes", "Verify identity through the approved secure workflow", "Provide the approved PUK recovery path or arrange a replacement SIM"],
+        "kb_steps": ["Record the exact lock warning", "Never guess additional PIN or PUK codes", "Escalate to secure identity-verified recovery"],
+        "escalate": "Escalate to an admin; repeated incorrect PUK attempts can permanently block the SIM.",
+    },
+    {
+        "key": "BILL-PLAN", "product": "Billing Account", "intent": "billing.plan_change_missing",
+        "category": "Billing", "severity": "P2", "kb": "KB-BILL-PLAN",
+        "en": ["I changed my plan but the bill still shows the old package", "The new plan is not reflected on my account after confirmation", "My plan change was confirmed but I am still billed for the previous plan"],
+        "attempt": "I kept the plan-change confirmation", "cause": "Plan-change order or billing-cycle mismatch",
+        "steps": ["Compare the requested plan and effective date with the account order", "Review the billing cycle and plan-change status", "Correct a confirmed mismatch through the approved billing workflow"],
+        "kb_steps": ["Record the requested plan and confirmation date", "Compare the effective date with the billing period", "Escalate any account mismatch without promising an adjustment"],
+        "escalate": "Escalate confirmed plan or bill mismatches for account review.",
+    },
+    {
+        "key": "TV-AUDIO", "product": "TV", "intent": "tv.audio_missing",
+        "category": "Technical Support", "severity": "P3", "kb": "KB-TV-AUDIO",
+        "en": ["The TV picture is fine but there is no sound on any channel", "My set-top box shows video without audio", "Several channels have silent audio while the picture keeps playing"],
+        "attempt": "I checked the TV volume", "cause": "TV or set-top-box audio output configuration issue",
+        "steps": ["Confirm whether sound is missing on every channel and input", "Check the TV and set-top-box audio output settings", "Escalate a persistent audio fault for equipment diagnostics"],
+        "kb_steps": ["Compare sound across channels and other inputs", "Check mute and audio output selections", "Escalate persistent missing audio"],
+        "escalate": "Escalate if sound is missing across channels after ordinary audio checks.",
+    },
 ]
 
 CONTEXT = [
@@ -189,6 +243,12 @@ EVAL_ALT = {
     "PLAN-RENEW": ("The top-up succeeded but the data pack never started", "The recharge payment went through but the data plan is not active"),
     "PORT-DELAY": ("The number transfer date has passed and both old and new SIMs are dead", "The port deadline is over and neither my old nor new SIM works"),
     "TV-PIXEL": ("The picture on channels keeps freezing into blocks", "TV channels stutter and break into square blocks"),
+    "BB-POWER": ("The router has no lights and my home internet is unavailable", "My broadband box is dark and will not power up"),
+    "MOB-SMS-OUT": ("Texts arrive on my phone but every message I send fails", "I receive SMS normally but cannot send one to anyone"),
+    "MOB-HOTSPOT": ("The phone itself has data but my computer gets no internet through its hotspot", "Personal hotspot connects my tablet but websites never load"),
+    "SIM-PIN": ("After entering the wrong SIM PIN my phone now requests a PUK", "My SIM is blocked and the screen asks for the PUK code"),
+    "BILL-PLAN": ("My confirmed plan change is absent from the latest bill", "I selected a new package but my account still shows the former plan"),
+    "TV-AUDIO": ("The channels have a clear picture but no sound", "Video plays from the set-top box yet the TV stays silent"),
 }
 
 SENTIMENT_PHRASE = {"frustrated": "This is really frustrating.", "concerned": "I am concerned this may continue."}
@@ -358,14 +418,9 @@ def main() -> None:
     write_jsonl("kb_articles.jsonl", [kb_article(issue) for issue in ISSUES])
     write_jsonl("eval_cases.jsonl", evals)
     # Apply these only in a dedicated update test, not to the baseline index.
-    promote = []
-    seen_intents = set()
-    for record in sorted(unresolved, key=lambda r: r["ticket_id"]):
-        if record["intent"] not in seen_intents:
-            promote.append(record)
-            seen_intents.add(record["intent"])
-        if len(promote) == 3:
-            break
+    # Keep the original update fixture stable as new issue families are added.
+    promote = [next(record for record in unresolved if record["ticket_id"] == f"T-{key}-013")
+               for key in ("BB-DROP", "BB-OUTAGE", "BB-SLOW")]
     events = []
     for record in promote:
         issue = next(item for item in ISSUES if item["intent"] == record["intent"])

@@ -58,11 +58,13 @@ class FakeLLM:
         if kind == "draft":
             customer = re.findall(r'id="([^"]+)" type="kb" audience="customer"', user)
             admin = re.findall(r'id="([^"]+)" type="(?:kb|ticket)" audience="admin"', user)
+            precautions = json.loads(user.split("<precaution_candidates>")[1].split("</precaution_candidates>")[0])
             return json.dumps({
                 "probable_root_cause": {"text": "Possible line or Wi-Fi issue", "citations": admin[:1]},
                 "customer_steps": [{"text": f"Customer step {i + 1}", "detail": "why", "citations": [cid]}
                                    for i, cid in enumerate(customer[:2])] +
                                   [{"text": "Unsupported step", "citations": ["KB-FAKE#h9"]}],
+                "precaution_source_ids": [item["id"] for item in precautions[:2]],
                 "admin_steps": [{"text": "Admin check", "citations": admin[:1]},
                                 {"text": "Promise a refund within 2 days", "citations": admin[:1]}],
                 "customer_message": "Sorry about this.", "escalate_if": ["persists"], "abstain": False,

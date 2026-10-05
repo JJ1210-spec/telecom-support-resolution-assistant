@@ -143,6 +143,8 @@ def test_full_lifecycle(client, services, fake_llm):
         templates = [r.template for r in con.execute(sa.select(email_log).where(email_log.c.ticket_id == ticket_id))]
         pending = con.execute(sa.select(outbox).where(outbox.c.status != "sent")).all()
     assert learned is not None and learned.source == "learned" and learned.indexed_at is not None
+
+
     assert drafts and drafts[0].status == "draft"
     assert {"ticket_received", "admin_message", "solution_proposed", "reopened", "resolved"} <= set(templates)
     assert not pending
@@ -158,6 +160,27 @@ def test_full_lifecycle(client, services, fake_llm):
     assert ticket["feedback"]["rating"] == 5
     stats = admin.get("/v1/admin/stats").json()
     assert stats["tickets"] >= 1 and stats["reopen_rate"] > 0
+
+
+def test_admin_required_case_shows_only_safe_precautions(client, services):
+    Accounts(services.db).create("admin-precaution@test.dev", PASSWORD, "admin", "Arjun")
+    csrf = register(client, "precaution@test.dev")
+    response = client.post("/v1/tickets", headers=csrf, json={
+        "complaint": "The fiber box shows a red LOS light and there is no internet."})
+    assert response.status_code == 201, response.text
+    ticket = wait_analysis(client, response.json()["id"])
+    assert ticket["route"] == "human" and ticket["status"] == "escalated"
+    assert "admin" in ticket["why"].lower()
+    assert ticket["steps"], "expected safe information-only steps from the fiber guide"
+    assert all(step["origin"] == "ai" and "citations" not in step for step in ticket["steps"])
+    assert all(e["kind"] == "guide" for step in ticket["steps"] for e in step["evidence"])
+    assert client.post(f"/v1/tickets/{ticket['id']}/steps/{ticket['steps'][0]['id']}/feedback",
+                       headers=csrf, json={"status": "worked"}).status_code == 409
+
+    admin = TestClient(client.app)
+    login(admin, "admin-precaution@test.dev")
+    full = admin.get(f"/v1/admin/tickets/{ticket['id']}").json()
+    assert all(step["citations"] for step in full["steps"] if step["customer_visible"])
 
 
 def test_authorization_and_csrf(client, services):
@@ -181,7 +204,10 @@ def test_p1_outage_goes_to_human_and_never_self_service(client, services):
     ticket = wait_analysis(client, ticket_id)
     assert ticket["issue"]["severity"] == "P1"
     assert ticket["route"] == "human" and ticket["status"] == "escalated"
-    assert ticket["steps"] == []  # no AI steps are shown to the customer for P1
+    assert ticket["steps"] and len(ticket["steps"]) <= 2
+    assert all(step["evidence"] and step["evidence"][0]["kind"] == "guide" for step in ticket["steps"])
+    assert all(not step["text"].lower().startswith(("restart", "reset", "unplug"))
+               for step in ticket["steps"])
 
 
 def test_llm_outage_degrades_but_ticket_survives(client, services, fake_llm):

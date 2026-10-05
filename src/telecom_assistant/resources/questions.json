@@ -4,12 +4,13 @@
     {
       "id": "bb_symptom", "type": "single", "kind": "diagnostic",
       "text": "What best describes the internet problem?",
-      "scope": ["connectivity.intermittent_drop", "connectivity.slow_speed", "wifi.coverage_or_interference", "fiber.loss_of_signal", "connectivity.area_outage"],
+      "scope": ["connectivity.intermittent_drop", "connectivity.slow_speed", "wifi.coverage_or_interference", "fiber.loss_of_signal", "connectivity.area_outage", "connectivity.router_no_power"],
       "options": [
         {"id": "drops", "label": "It keeps disconnecting and reconnecting", "likely": {"connectivity.intermittent_drop": 1}},
         {"id": "slow", "label": "It's connected but very slow", "likely": {"connectivity.slow_speed": 1}},
         {"id": "rooms", "label": "Wi-Fi is weak only in some rooms", "likely": {"wifi.coverage_or_interference": 1}},
-        {"id": "down", "label": "No internet at all", "likely": {"fiber.loss_of_signal": 1, "connectivity.area_outage": 1}}
+        {"id": "down", "label": "No internet at all", "likely": {"fiber.loss_of_signal": 1, "connectivity.area_outage": 1}},
+        {"id": "no_power", "label": "The router has no power light", "likely": {"connectivity.router_no_power": 1}}
       ]
     },
     {
@@ -57,12 +58,14 @@
     {
       "id": "mobile_symptom", "type": "single", "kind": "diagnostic",
       "text": "What isn't working on your phone?",
-      "scope": ["mobile.data_unavailable", "mobile.voice_calls_fail", "mobile.otp_sms_missing", "mobile.roaming_unavailable"],
+      "scope": ["mobile.data_unavailable", "mobile.voice_calls_fail", "mobile.otp_sms_missing", "mobile.roaming_unavailable", "mobile.sms_send_failed", "mobile.hotspot_unavailable"],
       "options": [
         {"id": "data", "label": "Mobile data / internet", "likely": {"mobile.data_unavailable": 1}},
         {"id": "calls", "label": "Making or receiving calls", "likely": {"mobile.voice_calls_fail": 1}},
         {"id": "otp", "label": "OTP or bank SMS not arriving", "likely": {"mobile.otp_sms_missing": 1}},
-        {"id": "abroad", "label": "Nothing works - I'm abroad", "likely": {"mobile.roaming_unavailable": 1}, "facts": {"roaming": true}}
+        {"id": "abroad", "label": "Nothing works - I'm abroad", "likely": {"mobile.roaming_unavailable": 1}, "facts": {"roaming": true}},
+        {"id": "send_sms", "label": "I can receive texts but cannot send them", "likely": {"mobile.sms_send_failed": 1}},
+        {"id": "hotspot", "label": "Phone data works but hotspot devices are offline", "likely": {"mobile.hotspot_unavailable": 1}}
       ]
     },
     {
@@ -78,21 +81,32 @@
     {
       "id": "sim_situation", "type": "single", "kind": "diagnostic",
       "text": "Which of these matches your SIM situation?",
-      "scope": ["sim.activation_pending", "sim.esim_download_failed", "porting.transfer_delayed"],
+      "scope": ["sim.activation_pending", "sim.esim_download_failed", "porting.transfer_delayed", "sim.pin_locked"],
       "options": [
         {"id": "new_sim", "label": "New or replacement SIM isn't working", "likely": {"sim.activation_pending": 1}},
         {"id": "esim", "label": "eSIM QR code / download fails", "likely": {"sim.esim_download_failed": 1}},
-        {"id": "port", "label": "I'm moving my number from another operator", "likely": {"porting.transfer_delayed": 1}}
+        {"id": "port", "label": "I'm moving my number from another operator", "likely": {"porting.transfer_delayed": 1}},
+        {"id": "puk", "label": "The SIM is locked or asks for a PUK", "likely": {"sim.pin_locked": 1}}
       ]
     },
     {
       "id": "billing_issue", "type": "single", "kind": "diagnostic",
       "text": "What's the problem with your bill or payment?",
-      "scope": ["billing.unexpected_charge", "billing.payment_not_reflected", "plan.renewal_failed"],
+      "scope": ["billing.unexpected_charge", "billing.payment_not_reflected", "plan.renewal_failed", "billing.plan_change_missing"],
       "options": [
         {"id": "charge", "label": "There's a charge I don't recognise", "likely": {"billing.unexpected_charge": 1}},
         {"id": "paid", "label": "I paid but it still shows due", "likely": {"billing.payment_not_reflected": 1}},
-        {"id": "recharge", "label": "Recharge done but plan not active", "likely": {"plan.renewal_failed": 1}}
+        {"id": "recharge", "label": "Recharge done but plan not active", "likely": {"plan.renewal_failed": 1}},
+        {"id": "plan_change", "label": "A confirmed plan change is missing", "likely": {"billing.plan_change_missing": 1}}
+      ]
+    },
+    {
+      "id": "tv_symptom", "type": "single", "kind": "diagnostic",
+      "text": "What is happening with your TV service?",
+      "scope": ["tv.picture_breakup", "tv.audio_missing"],
+      "options": [
+        {"id": "picture", "label": "The picture freezes or breaks into blocks", "likely": {"tv.picture_breakup": 1}},
+        {"id": "audio", "label": "The picture is fine but sound is missing", "likely": {"tv.audio_missing": 1}}
       ]
     },
     {

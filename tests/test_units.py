@@ -11,7 +11,7 @@ from telecom_assistant.ai.clarify import (
     likelihood_table,
     load_bank,
 )
-from telecom_assistant.ai.resolver import route, validate_citations
+from telecom_assistant.ai.resolver import approved_precaution_text, route, select_precaution_steps, validate_citations
 from telecom_assistant.ai.triage import apply_rules
 from telecom_assistant.config import Settings
 from telecom_assistant.insights.discovery import agglomerate
@@ -94,6 +94,25 @@ def test_customer_step_evidence_exposes_only_safe_source_details():
     ]
     assert "citations" not in view["steps"][0]
     assert not any(value in str(view) for value in ("Private", "KB-1#h1", "KB-1#c1", "T-PAST"))
+
+
+def test_admin_route_precautions_use_only_reviewed_public_kb_wording():
+    citation = "KB-BILL-EXTRA#h1"
+    wording = approved_precaution_text()[citation]
+    public = {"id": citation, "kind": "kb", "audience": "customer", "intent": "billing.unexpected_charge",
+              "text": f"Unexpected Charge — customer self-help 1: {wording}"}
+    private = {"id": "KB-BILL-EXTRA#c1", "kind": "kb", "audience": "admin",
+               "intent": "billing.unexpected_charge", "text": "Run a billing adjustment"}
+    draft = {"precaution_source_ids": [private["id"], citation]}
+    steps = select_precaution_steps(draft, [private, public], "billing.unexpected_charge")
+    assert steps == [{"text": wording, "detail": "This check will not change your service or account.",
+                      "citations": [citation]}]
+    assert select_precaution_steps(draft, [private, {**public, "text": "Changed live KB text"}],
+                                   "billing.unexpected_charge") == []
+    assert select_precaution_steps(draft, [private, public], "mobile.data_unavailable") == []
+    assert select_precaution_steps({**draft, "abstain": True}, [private, public],
+                                   "billing.unexpected_charge") == []
+    assert select_precaution_steps({"precaution_source_ids": []}, [public], "billing.unexpected_charge") == []
 
 
 def _retrieval(sim: float, intent: str, n: int) -> RetrievalResult:

@@ -9,7 +9,7 @@ This log records issues found during the project. Keep the original symptom, att
 - **Cause:** A limited set of symptom and context phrases was reused without a case-specific detail.
 - **Method tried:** Counted exact `body` strings in each output and inspected the repeated patterns.
 - **Resolution:** Added distinct, plausible duration details to indexed complaints and a duplicate assertion to the validator.
-- **Verification:** Final generator and validator run passed: all 288 indexed complaint strings are unique.
+- **Verification:** The Phase 1 generator and validator run found all 288 training complaint strings unique. The expanded corpus now validates 396 unique training complaints.
 
 ## DATA-002 Closure evidence absent from resolved records — resolved
 
@@ -18,7 +18,7 @@ This log records issues found during the project. Keep the original symptom, att
 - **Cause:** The generator reused troubleshooting guidance as if it were a completed historical resolution.
 - **Method tried:** Reviewed the resolution steps and status relationship across issue families.
 - **Resolution:** Added a closure confirmation step and explicit synthetic closure evidence to every resolved record. Unresolved records keep these fields empty.
-- **Verification:** Final validator run passed: all 192 resolved records have steps and closure evidence; all 96 unresolved records have neither.
+- **Verification:** The Phase 1 validator checked 192 resolved and 96 unresolved records. The expanded corpus now validates the same boundary for 264 resolved and 132 unresolved records.
 
 ## DATA-003 Inaccurate edge-case tags — resolved
 

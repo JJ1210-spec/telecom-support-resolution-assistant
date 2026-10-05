@@ -8,8 +8,8 @@ Routing answers the product question "can the customer fix this themselves right
 * ``assisted`` — the customer still gets safe self-help steps, but the ticket also goes to the human
   queue (e.g. P2, churn risk, weaker evidence).
 * ``human`` — complex, high-risk or unclear: P1, sensitive intents (billing disputes, identity, porting),
-  unknown class, prompt-injection, abstention. No AI steps are shown to the customer; the admin gets a
-  copilot brief instead.
+  unknown class, prompt-injection, abstention. An admin owns the fix. When the evidence is strong enough,
+  the customer may see a few approved, read-only precautions backed by public KB sections.
 Every decision carries the list of reasons that produced it.
 """
 
@@ -18,6 +18,8 @@ from __future__ import annotations
 import json
 import re
 from collections.abc import Awaitable, Callable
+from functools import lru_cache
+from importlib import resources
 
 from pydantic import BaseModel, Field
 
@@ -31,6 +33,44 @@ UNSUPPORTED_COMMITMENT = re.compile(
     r"|by (today|tonight|tomorrow)|technician will (arrive|visit))\b", re.IGNORECASE)
 UNSAFE_CUSTOMER = re.compile(r"\b(factory reset|open the (router|ont) case|climb|share (your )?(otp|password|pin)"
                              r"|full card)\b", re.IGNORECASE)
+
+
+@lru_cache(maxsize=1)
+def approved_precaution_text() -> dict[str, str]:
+    """Only code-reviewed seed self-help text can become an admin-route precaution."""
+    package = resources.files("telecom_assistant.resources")
+    helps = json.loads(package.joinpath("kb_self_help.json").read_text(encoding="utf-8"))
+    sections = json.loads(package.joinpath("precaution_sections.json").read_text(encoding="utf-8"))
+    return {f"{kb_id}#h{number}": helps[kb_id][number - 1]
+            for kb_id, numbers in sections.items() if not kb_id.startswith("_") for number in numbers}
+
+
+def precaution_candidates(sources: list[dict], intent: str | None) -> list[dict]:
+    approved = approved_precaution_text()
+    candidates = []
+    for source in sources:
+        citation = source.get("id")
+        expected = approved.get(citation)
+        if (expected and source.get("kind") == "kb" and source.get("audience") == "customer"
+                and source.get("intent") == intent
+                and (source.get("text") or "").endswith(": " + expected)):
+            candidates.append({"id": citation, "text": expected})
+    return candidates
+
+
+def select_precaution_steps(draft: dict, sources: list[dict], intent: str | None) -> list[dict]:
+    """Use the AI's source choices, but display only the reviewed KB wording."""
+    if draft.get("abstain"):
+        return []
+    candidates = {item["id"]: item["text"] for item in precaution_candidates(sources, intent)}
+    steps = []
+    for citation in dict.fromkeys(draft.get("precaution_source_ids") or []):
+        if citation in candidates:
+            steps.append({"text": candidates[citation], "detail": "This check will not change your service or account.",
+                          "citations": [citation]})
+        if len(steps) == 2:
+            break
+    return steps
 
 
 class Cited(BaseModel):
@@ -49,6 +89,7 @@ class AdminStep(Cited):
 class DraftOut(BaseModel):
     probable_root_cause: Cited | None = None
     customer_steps: list[CustomerStep] = Field(default_factory=list)
+    precaution_source_ids: list[str] = Field(default_factory=list)
     admin_steps: list[AdminStep] = Field(default_factory=list)
     customer_message: str = ""
     escalate_if: list[str] = Field(default_factory=list)
@@ -216,7 +257,9 @@ class Resolver:
                             f'similarity="{(s.get("similarity") or 0):.2f}">{body[:450]}</source>')
         user = (f"<complaint>\n{complaint[:3000]}\n</complaint>\n<triage>{json.dumps(self._triage_view(triage))}"
                 f"</triage>\n<already_tried>{json.dumps(tried)}</already_tried>\n<sources>\n" + "\n".join(rendered)
-                + "\n</sources>")
+                + "\n</sources>\n<precaution_candidates>"
+                + json.dumps(precaution_candidates(sources, triage.get("intent")))
+                + "</precaution_candidates>")
         system = DRAFT_SYSTEM
         try:
             result = await self.llm.json("draft", system, user, DraftOut, max_tokens=1000, trace_id=trace_id,
