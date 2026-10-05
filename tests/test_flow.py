@@ -89,9 +89,10 @@ def test_full_lifecycle(client, services, fake_llm):
 
     # every AI customer step is grounded in a self-help section; the fabricated one was dropped
     assert ticket["steps"], "expected grounded customer steps"
-    assert all(any("#h" in c for c in s["citations"]) for s in ticket["steps"])
-    assert all(any(e["kind"] == "guide" and e["id"] in s["citations"] for e in s["evidence"])
+    assert all("citations" not in s for s in ticket["steps"])
+    assert all(any(e["kind"] == "guide" and e["excerpt"] for e in s["evidence"])
                for s in ticket["steps"])
+    assert all("id" not in e for s in ticket["steps"] for e in s["evidence"])
     assert not any(s["text"] == "Unsupported step" for s in ticket["steps"])
 
     # side chat on a step, then mark every step as not working -> escalated with history
@@ -111,6 +112,7 @@ def test_full_lifecycle(client, services, fake_llm):
     assert any(t["id"] == ticket_id for t in queue)
     full = admin.post(f"/v1/admin/tickets/{ticket_id}/claim", headers=admin_csrf).json()
     assert full["status"] == "in_progress"
+    assert all(s["citations"] for s in full["steps"] if s["origin"] == "ai")
     brief = admin.post(f"/v1/admin/tickets/{ticket_id}/copilot", headers=admin_csrf).json()
     assert brief["next_actions"] and all(a["citations"] for a in brief["next_actions"])
     full = admin.post(f"/v1/admin/tickets/{ticket_id}/messages", headers=admin_csrf, json={

@@ -89,10 +89,11 @@ def test_customer_step_evidence_exposes_only_safe_source_details():
     view = TicketStore.customer_view(ticket)
     evidence = view["steps"][0]["evidence"]
     assert evidence == [
-        {"id": "KB-1#h1", "kind": "guide", "title": "Router guide", "excerpt": "Check the router light."},
-        {"id": "T-PAST", "kind": "case", "title": "Past resolved support case"},
+        {"kind": "guide", "title": "Router guide", "excerpt": "Check the router light."},
+        {"kind": "case", "title": "Past resolved support case"},
     ]
-    assert "Private" not in str(view)
+    assert "citations" not in view["steps"][0]
+    assert not any(value in str(view) for value in ("Private", "KB-1#h1", "KB-1#c1", "T-PAST"))
 
 
 def _retrieval(sim: float, intent: str, n: int) -> RetrievalResult:

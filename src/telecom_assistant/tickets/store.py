@@ -195,12 +195,12 @@ class TicketStore:
                 source = sources.get(citation)
                 if not source:
                     continue
-                if source.get("kind") == "kb" and source.get("audience") == "customer":
-                    evidence.append({"id": citation, "kind": "guide", "title": source.get("title") or "Support guide",
+                if source.get("kind") == "kb" and source.get("audience") == "customer" and "#h" in citation:
+                    evidence.append({"kind": "guide", "title": source.get("title") or "Support guide",
                                      "excerpt": source.get("snippet") or ""})
                 elif source.get("kind") == "ticket":
                     # Historical tickets may contain another customer's details or admin-only actions.
-                    evidence.append({"id": citation, "kind": "case", "title": "Past resolved support case"})
+                    evidence.append({"kind": "case", "title": "Past resolved support case"})
             return evidence
 
         return {
@@ -214,7 +214,7 @@ class TicketStore:
             "why": decision.get("customer_reason"), "recurrence": decision.get("recurrence"),
             "sla_due_at": ticket.get("sla_due_at"),
             "steps": [{**{k: s[k] for k in ("id", "position", "text", "detail", "status", "status_note", "origin",
-                                              "citations", "plan_version")}, "evidence": public_evidence(s)}
+                                              "plan_version")}, "evidence": public_evidence(s)}
                       for s in visible_steps if s["plan_version"] == latest_plan],
             "messages": [{k: m[k] for k in ("id", "author_role", "body", "options", "answered_option", "step_id",
                                             "created_at")}

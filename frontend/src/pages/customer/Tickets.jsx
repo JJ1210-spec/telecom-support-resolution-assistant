@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Link, NavLink, Outlet, useParams } from "react-router-dom";
 import { api } from "../../api/client";
 import { Composer, Thread } from "../../components/Chat";
@@ -113,17 +113,6 @@ const PROGRESS_TEXT = {
   triaging: "Understanding your issue…",
   drafting: "Preparing step-by-step help…",
 };
-function sourcesForSteps(steps) {
-  const byId = new Map();
-  for (const step of steps) {
-    for (const source of step.evidence ?? []) {
-      const entry = byId.get(source.id);
-      if (entry) entry.steps.push(step.position);
-      else byId.set(source.id, { ...source, steps: [step.position] });
-    }
-  }
-  return [...byId.values()].sort((a, b) => b.steps.length - a.steps.length);
-}
 export function TicketDetail() {
   const { id = "" } = useParams();
   const ticket = useResource(() => api.get(`/v1/tickets/${id}`), [id]);
@@ -133,11 +122,6 @@ export function TicketDetail() {
   const [toast, showToast] = useToast();
   const [reopenOpen, setReopenOpen] = useState(false);
   const [tab, setTab] = useState("steps");
-  const [selectedSource, setSelectedSource] = useState(null);
-  const selectedSourceRef = useRef(null);
-  useEffect(() => {
-    if (tab === "sources" && selectedSource) selectedSourceRef.current?.focus();
-  }, [tab, selectedSource]);
   useLiveEvents((event) => {
     if (event.ticket_id !== id) return;
     if (event.kind === "analysis_progress") setStage(String(event.stage));
@@ -165,14 +149,9 @@ export function TicketDetail() {
   const analyzing = t.analysis_state === "running";
   const open = !["resolved", "closed"].includes(t.status);
   const anyWorked = t.steps.some((s) => s.status === "worked");
-  const sources = sourcesForSteps(t.steps);
   const generalMessages = t.messages.filter((m) => !m.step_id);
   const current = stageOf(t.status);
   const canReopen = ["self_service", "solution_proposed", "awaiting_customer", "resolved"].includes(t.status);
-  const showSource = (sourceId) => {
-    setSelectedSource(sourceId);
-    setTab("sources");
-  };
   return (
     <section className="workspace" aria-label={`Ticket ${t.id}`}>
       <header className="ws-head">
@@ -263,12 +242,6 @@ export function TicketDetail() {
               <button className={`tab${tab === "details" ? " active" : ""}`} onClick={() => setTab("details")}>
                 Details
               </button>
-              <button
-                className={`tab${tab === "sources" ? " active" : ""}`}
-                onClick={() => { setSelectedSource(null); setTab("sources"); }}
-              >
-                Sources <span className="count">{sources.length}</span>
-              </button>
             </div>
           </div>
           <div className="panel-body">
@@ -279,7 +252,6 @@ export function TicketDetail() {
                 open={open}
                 anyWorked={anyWorked}
                 onChat={setChatStep}
-                onSource={showSource}
                 onStatus={(s, status) =>
                   act(
                     () => api.post(`/v1/tickets/${t.id}/steps/${s.id}/feedback`, { status }),
@@ -332,9 +304,6 @@ export function TicketDetail() {
                 <dt>Target response</dt>
                 <dd>{t.sla_due_at ? new Date(t.sla_due_at).toLocaleString() : "—"}</dd>
               </dl>
-            )}
-            {tab === "sources" && (
-              <SourcesTab sources={sources} selectedSource={selectedSource} selectedSourceRef={selectedSourceRef} />
             )}
           </div>
         </div>
@@ -395,7 +364,7 @@ export function TicketDetail() {
     </section>
   );
 }
-function StepsTab({ ticket: t, busy, open, anyWorked, onStatus, onChat, onSource, onSolved, onAdmin, onRate }) {
+function StepsTab({ ticket: t, busy, open, anyWorked, onStatus, onChat, onSolved, onAdmin, onRate }) {
   return (
     <div className="stack">
       {!open && (
@@ -424,7 +393,7 @@ function StepsTab({ ticket: t, busy, open, anyWorked, onStatus, onChat, onSource
             <strong>{t.steps[0]?.origin !== "ai" ? "Steps from your admin" : "Suggested steps for your issue"}</strong>
             <p className="caption">
               Try each step, then tell us whether it worked. {t.steps[0]?.origin === "ai" &&
-                "The sources under each suggestion show what supports it. "}
+                "The information under each suggestion explains what supports it. "}
               Stuck? Use “Ask about this step”.
             </p>
           </div>
@@ -437,7 +406,6 @@ function StepsTab({ ticket: t, busy, open, anyWorked, onStatus, onChat, onSource
                 chatCount={t.messages.filter((m) => m.step_id === s.id).length}
                 onStatus={(status) => onStatus(s, status)}
                 onChat={() => onChat(s)}
-                onSource={onSource}
               />
             ))}
           </div>
@@ -460,7 +428,7 @@ function StepsTab({ ticket: t, busy, open, anyWorked, onStatus, onChat, onSource
     </div>
   );
 }
-function StepRow({ step, disabled, chatCount, onStatus, onChat, onSource }) {
+function StepRow({ step, disabled, chatCount, onStatus, onChat }) {
   const evidence = step.evidence ?? [];
   return (
     <div className={`step ${step.status}`}>
@@ -478,21 +446,12 @@ function StepRow({ step, disabled, chatCount, onStatus, onChat, onSource }) {
         {step.detail && <div className="muted body-sm">{step.detail}</div>}
         {step.origin === "ai" && evidence.length > 0 && (
           <div className="step-evidence">
-            <div className="step-evidence-title">Sources for this step</div>
+            <div className="step-evidence-title">Why we're suggesting this</div>
             <ul>
-              {evidence.map((source) => (
-                <li key={source.id}>
-                  <button
-                    type="button"
-                    className="step-source-link"
-                    onClick={() => onSource(source.id)}
-                    aria-label={`View ${source.id} in Sources`}
-                  >
-                    <span className="step-source-type">{source.kind === "guide" ? "Support guide" : "Past resolved case"}</span>
-                    <strong>{source.title}</strong>
-                    <span className="step-source-id">{source.id}</span>
-                    <span aria-hidden="true">→</span>
-                  </button>
+              {evidence.map((source, index) => (
+                <li key={`${source.kind}-${index}`}>
+                  <span className="step-source-type">{source.kind === "guide" ? "Support guide" : "Past resolved case"}</span>
+                  <strong>{source.title}</strong>
                   {source.excerpt && <p>{source.excerpt}</p>}
                 </li>
               ))}
@@ -500,7 +459,7 @@ function StepRow({ step, disabled, chatCount, onStatus, onChat, onSource }) {
           </div>
         )}
         {step.origin === "ai" && evidence.length === 0 && (
-          <p className="caption">Source details are unavailable for this step. Ask an admin if you need more context.</p>
+          <p className="caption">An admin can review the supporting information for this suggestion.</p>
         )}
         <div className="row" style={{ marginTop: 4 }}>
           <div className="seg" role="group" aria-label="Did this step work?">
@@ -524,51 +483,6 @@ function StepRow({ step, disabled, chatCount, onStatus, onChat, onSource }) {
           </button>
         </div>
       </div>
-    </div>
-  );
-}
-function SourcesTab({ sources, selectedSource, selectedSourceRef }) {
-  if (!sources.length) {
-    return <Empty title="No cited sources">There are no AI-suggested steps with sources on this ticket.</Empty>;
-  }
-  const selected = sources.find((source) => source.id === selectedSource);
-  const ordered = selected ? [selected, ...sources.filter((source) => source.id !== selectedSource)] : sources;
-  return (
-    <div className="stack">
-      <div className="step-intro">
-        <strong>Sources used for your suggested steps</strong>
-        <p className="caption">The five most-used sources appear first. A source opened from a step moves to the top. Past cases are identified without sharing another customer's details.</p>
-      </div>
-      <div className="source-list">
-        {ordered.slice(0, 5).map((source) => (
-          <SourceCard key={source.id} source={source} selectedSource={selectedSource} selectedSourceRef={selectedSourceRef} />
-        ))}
-      </div>
-      {ordered.length > 5 && (
-        <>
-          <h3 className="title-sm">Additional cited sources</h3>
-          <div className="source-list">
-            {ordered.slice(5).map((source) => (
-              <SourceCard key={source.id} source={source} selectedSource={selectedSource} selectedSourceRef={selectedSourceRef} />
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-function SourceCard({ source, selectedSource, selectedSourceRef }) {
-  const selected = source.id === selectedSource;
-  return (
-    <div className={`source-card${selected ? " selected" : ""}`} tabIndex={selected ? -1 : undefined}
-      ref={selected ? selectedSourceRef : undefined}>
-      <div className="row-between">
-        <span className="step-source-type">{source.kind === "guide" ? "Support guide" : "Past resolved case"}</span>
-        <span className="step-source-id">{source.id}</span>
-      </div>
-      <h3 className="title-sm">{source.title}</h3>
-      {source.excerpt && <p className="body-sm">{source.excerpt}</p>}
-      <p className="caption">Used for {source.steps.length === 1 ? "step" : "steps"} {source.steps.join(", ")}</p>
     </div>
   );
 }

@@ -260,17 +260,7 @@ table.table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .step-evidence li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; padding: 9px 0; border-top: 1px solid var(--hairline-soft); overflow-wrap: anywhere; font-size: 13px; }
 .step-evidence li strong { font-weight: 600; }
 .step-evidence li p { width: 100%; margin: 0; color: var(--body); }
-.step-source-link { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; padding: 0; border: 0; background: none; color: var(--primary); font: inherit; text-align: left; cursor: pointer; }
-.step-source-link:hover { text-decoration: underline; }
-.step-source-link:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
 .step-source-type { color: var(--muted); }
-.step-source-id { font-family: var(--mono); color: var(--muted); font-size: 11px; }
-.source-list { display: grid; gap: 10px; }
-.source-card { padding: 16px; border: 1px solid var(--hairline); border-radius: var(--r-lg); background: var(--surface-soft); overflow-wrap: anywhere; }
-.source-card.selected { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-tint); }
-.source-card:focus { outline: none; }
-.source-card h3 { margin: 8px 0; }
-.source-card p { margin: 6px 0 0; }
 .customer-tabs { width: 100%; justify-content: space-between; gap: 0; }
 .customer-tabs .tab { padding-inline: 8px; }
 @media (max-width: 400px) {
