@@ -168,10 +168,6 @@ The deployed design uses one API container and external managed services. The fo
 ## Operational limits
 
 - The data is synthetic and shares issue templates across training and evaluation. No production accuracy or real-world fix rate has been established.
-- The application accepts free-text complaints; a dedicated pre-submission relevance filter for irrelevant text has not been implemented. Unknown or weak-evidence cases route conservatively to an admin and may enter the discovery pool.
-- Customer evidence is privacy-filtered, but PII detection is regex-based. Do not use real customer data with third-party providers without suitable agreements and additional review.
-- Live events use an in-process bus. Multiple API replicas would need shared pub/sub; the UI can also reload stored ticket data.
-- Background resolution learning resumes unfinished work on startup, but it is not a durable external job system. There are no email or off-app notifications.
 - The current automated Incident Radar test covers grouping; it does not prove end-to-end delivery to every linked customer screen.
 
 ## Repository map
