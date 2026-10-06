@@ -1,139 +1,29 @@
-# Deploying Resolve Desk online (free)
+# Deployment
 
-The app is a **single Docker container**: the FastAPI backend and the built React website.
-The databases are already hosted (Neon Postgres, Qdrant Cloud, Upstash), so deploying
-only means running that one container somewhere public.
+Resolve Desk builds the React interface into a single Docker image and serves it with FastAPI. The included [Render blueprint](../render.yaml) defines one web service. PostgreSQL, Qdrant, and Redis are external services; a new deployment does not create or populate them automatically.
 
-**Recommended host: [Render](https://render.com)**. The free plan needs no credit card and builds straight from
-GitHub using the `Dockerfile` and `render.yaml` in this repo.
+## Prepare the services
 
----
+1. Provision a PostgreSQL database and a Qdrant cluster. Upstash Redis is used for shared caches, rate limits, and quota counters. For a single-instance evaluation, the application can fall back to memory when Redis is absent.
+2. Set the variables listed in [`.env.example`](../.env.example) on the deployment platform. At minimum, a hosted AI workflow needs `DATABASE_URL`, `QDRANT_URL`, `QDRANT_API_KEY`, `JINA_API_KEY`, and at least one configured LLM provider key (`GEMINI_API_KEY` or `GROQ_API_KEY`). Set both provider keys for failover. Add the Upstash REST URL/token for shared state; Langfuse keys are optional for tracing. Never commit `.env` or credentials.
+3. Use HTTPS for the public deployment. Give the application a stable `DATABASE_URL`; the database is the system of record, while the vector index is derived from the saved corpus.
 
-## Before you start (5 minutes)
+## Deploy the application
 
-1. **Merge the pull request** into `main`:
-   https://github.com/JJ1210-spec/telecom-support-resolution-assistant/pull/1 → **Merge pull request** →
-   **Confirm merge**. (You can also deploy the `feature/resolve-desk-v1` branch directly.)
-2. **Keep your `.env` file open.** You'll copy values from it. Never commit it.
-3. **The data is already loaded.** The knowledge base, past tickets and demo accounts are already in your Neon
-   database and Qdrant cluster, and the deployed app uses the same ones. You do **not** need to seed again.
+1. Connect this repository to Render and create a Blueprint from `render.yaml` on the branch you intend to submit. Supply the secret values requested by the blueprint. Alternatively, deploy the root `Dockerfile` as a Docker web service and set the same environment variables.
+2. Wait for the build and startup to finish. Open `/health` for the process check and `/ready` for component status. `/ready` reports database, vector-store, and cache availability; inspect the JSON flags rather than relying only on the HTTP status. Also load the home page to confirm the built frontend is being served.
+3. From a trusted machine with **the same hosted environment variables**, install the Python package and run `python -m telecom_assistant.cli seed` once to load the synthetic corpus. Validate the input first with `python scripts/validate_telecom_dataset.py`. The importer can be rerun safely; unresolved cases are stored but are not used as resolved-solution evidence. New corpus files added later also require another seed run.
+4. Create an admin with `python -m telecom_assistant.cli create-user --email you@example.com --role admin`; the CLI prompts for a password. For a synthetic demo only, `seed --demo --demo-tickets 6` creates demo accounts and tickets. Do not assume demo accounts exist in a fresh deployment. A customer can register through the site.
+5. Sign in as a customer and an admin, submit a test complaint, and check that the ticket reaches the admin queue or offers cited customer-safe steps. Confirm that source detail opens in the admin view and that the customer sees only privacy-safe evidence.
 
----
+The container reads `PORT` (default `8000`). Application data is held in external services, not the container filesystem. For a local Docker run, create `.env` and use `docker compose up --build`.
 
-## Option A: Render Blueprint (recommended)
+## CI and scheduled evaluation
 
-1. Go to https://dashboard.render.com and **sign in with GitHub**.
-2. Click **New +** → **Blueprint**.
-3. Select the repository **JJ1210-spec/telecom-support-resolution-assistant** (grant Render access if asked) and
-   the branch (`main`, or `feature/resolve-desk-v1` if you didn't merge).
-4. Render reads `render.yaml` and shows one service, **resolve-desk**, plus a form for the secret values. Paste
-   each one from your `.env`:
+[CI](../.github/workflows/ci.yml) runs lint, Python tests, dataset validation, frontend build, and Docker build on pushes and pull requests. The [nightly workflow](../.github/workflows/nightly.yml) runs hosted evaluation, drift detection, and class discovery on a schedule or through **Actions → nightly → Run workflow**. It requires repository secrets for the hosted database, vector store, Jina, Gemini, Groq, and Upstash endpoints. The workflow checks for missing secrets before running; Langfuse secrets are optional. Its evaluation report is uploaded as a workflow artifact. Repository visibility does not need to change to run it.
 
-   | Key | Where to copy it from |
-   |---|---|
-   | `GEMINI_API_KEY` | `.env` |
-   | `GROQ_API_KEY` | `.env` |
-   | `JINA_API_KEY` | `.env` |
-   | `QDRANT_URL` | `.env` |
-   | `QDRANT_API_KEY` | `.env` |
-   | `DATABASE_URL` | `.env` (the full Neon connection string) |
-   | `UPSTASH_REDIS_REST_URL` | `.env` |
-   | `UPSTASH_REDIS_REST_TOKEN` | `.env` |
-   | `LANGFUSE_PUBLIC_KEY` | `.env` (optional) |
-   | `LANGFUSE_SECRET_KEY` | `.env` (optional) |
-5. Click **Apply**. Render builds the Docker image, which takes about 5–8 minutes the first time. Watch the
-   **Logs** tab until you see `Application startup complete`.
-6. Open the URL Render shows at the top of the service, e.g. `https://resolve-desk.onrender.com`.
-7. **Check it works:**
-   - `https://<your-url>/health` shows `{"status":"ok"}`;
-   - `https://<your-url>/ready` shows `"database":true,"vector_store":true,"kv":true`;
-   - the home page loads, and you can sign in with `customer@resolvedesk.dev` or `admin@resolvedesk.dev`
-     (password = `DEMO_PASSWORD` in your `.env`).
+## Rollback and data changes
 
-### Things to know about the free plan
-- **It sleeps after 15 minutes without traffic.** The first visit after that takes about 50 seconds to wake up.
-  Before a demo or interview, open the site a minute early.
-- Every push to the deployed branch redeploys automatically.
-- Pushing new synthetic corpus files does not automatically add those rows to an existing hosted database. From a
-  trusted environment with the hosted `DATABASE_URL`, `QDRANT_URL`, `QDRANT_API_KEY` and embedding credentials,
-  run `.venv/Scripts/python -m telecom_assistant.cli seed` once after the deployment. The importer is idempotent;
-  it stores unresolved rows but indexes only resolved rows as solution evidence. For the current corpus, its source
-  files contain 264 resolved tickets, 132 unresolved tickets and 22 KB articles. Run
-  `.venv/Scripts/python scripts/validate_telecom_dataset.py` before the import.
-- Logs are under **Logs** in the Render dashboard.
+If a deployment fails, redeploy a known working commit through the host's deployment controls, then check `/health`, `/ready`, customer sign-in, and admin sign-in. Reverting the commit on the deployment branch keeps subsequent builds on that code. A code rollback does **not** undo rows seeded into PostgreSQL, Qdrant points, published KB changes, or taxonomy updates. Restore those separately from backups or with a reviewed migration when necessary.
 
----
-
-## Option B: Manual "Web Service" (no Blueprint)
-
-1. Render → **New +** → **Web Service** → pick the repo and branch.
-2. **Runtime:** Docker (detected from the `Dockerfile`). **Instance type:** Free.
-3. **Health check path:** `/health`.
-4. **Environment variables:** add the same keys as in the table above.
-5. Click **Create Web Service**, then follow steps 5–7 above.
-
----
-
-## Keeping it healthy
-
-- **Qdrant free clusters pause after about 1 week without use.** The included GitHub Action
-  (`.github/workflows/nightly.yml`) runs every night and keeps the cluster active, if you add your keys as
-  repository secrets: GitHub repo → **Settings** → **Secrets and variables** → **Actions** →
-  **New repository secret**. Add `GEMINI_API_KEY`, `GROQ_API_KEY`, `JINA_API_KEY`, `QDRANT_URL`,
-  `QDRANT_API_KEY`, `DATABASE_URL`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` (and optionally the two
-  Langfuse keys). The workflow now fails at **Validate required Actions secrets** and names missing keys before
-  running the evaluator. Confirm the names with `gh secret list`, then use **Actions → nightly → Run workflow**
-  to verify a fresh evaluation appears in **System health → Evaluation**. Repository privacy does not need to change.
-  If the cluster does pause, resume it in the Qdrant Cloud console.
-- **Free LLM quotas:** about 1,000 requests a day per model and 15–30 per minute. Fine for demos. The **System
-  health** page shows the meters.
-- **CI:** every push runs tests and the frontend build on GitHub Actions (`.github/workflows/ci.yml`).
-
-## Roll back a deployment
-
-The previous working code is preserved at Git tag `rollback/admin-only-base-20261004` (commit `00ec8a0`).
-Application rollback does not remove newly seeded corpus rows, KB sections or taxonomy classes from the hosted
-database and vector collections. The previous code can read the same hosted data, but restoring the exact old
-dataset requires a separate, reviewed data restore or targeted removal of the newly added synthetic IDs.
-
-If a deployment fails, open the Render service's **Events** page and use **Rollback** on the last successful
-deployment. If that deployment is no longer listed, use **Manual Deploy → Deploy a specific commit** and enter
-`00ec8a0`. Check `/health`, `/ready`, customer sign-in, and admin sign-in after the rollback. To keep the
-deployed branch on the old code, revert this change's commit on `main` and push the revert.
-
----
-
-## Optional extras
-
-| Want | Do this |
-|---|---|
-| **Custom domain** | Render → service → **Settings** → **Custom Domains** |
-| **Fresh database** | Point `DATABASE_URL` / `QDRANT_URL` at new instances, then run locally once: `.venv\Scripts\python -m telecom_assistant.cli seed --demo --demo-tickets 6` (it writes to whatever `.env` points at) |
-| **No sleeping** | Upgrade the Render instance to Starter (paid) |
-
----
-
-## Other hosts (same Docker image)
-
-- **Railway:** New Project → Deploy from GitHub repo → it detects the `Dockerfile`. Add the same environment
-  variables, then **Settings** → **Networking** → **Generate Domain**.
-- **Google Cloud Run** (needs a billing account; has a free tier):
-  `gcloud run deploy resolve-desk --source . --region asia-south1 --allow-unauthenticated`, then set the
-  environment variables in the console.
-- **Fly.io:** `fly launch` (uses the `Dockerfile`), then `fly secrets set GEMINI_API_KEY=... ...` and `fly deploy`.
-
-The container listens on the `PORT` environment variable (default 8000) and needs no disk, because all data
-lives in the hosted services.
-
----
-
-## Troubleshooting
-
-| Symptom | Fix |
-|---|---|
-| Build fails at `npm ci` | Make sure `frontend/package-lock.json` is committed (it is) |
-| `/ready` shows `"database": false` | Re-check `DATABASE_URL` (copy the whole string, including `?sslmode=require...`) |
-| `"vector_store": false` | The Qdrant cluster is paused; resume it in the Qdrant console |
-| Pages load but analysis says the LLM is unavailable | Check `GEMINI_API_KEY` / `GROQ_API_KEY`; see **System health** for quota meters |
-| Can't sign in | Use the `DEMO_PASSWORD` from your `.env`, or register a new customer |
-| Slow first load | The free instance was asleep; wait about 50 s |
+For service failures, check the component flags at `/ready` and the application logs. An unavailable LLM can leave ticket creation working while analysis falls back to an admin route; a missing vector service reduces retrieval capability. See [Architecture](architecture.md) for the degradation paths and known scaling limits.

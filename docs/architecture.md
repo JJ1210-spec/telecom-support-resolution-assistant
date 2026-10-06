@@ -1,8 +1,9 @@
 # Architecture and Design Decisions
 
 Resolve Desk is a telecom support system that works out what is wrong, fixes simple and recurring issues
-itself with grounded steps, and sends complex ones to people with an AI copilot. A ticket stays open until
-the customer confirms the fix. Each confirmed resolution is added to the knowledge base.
+itself with grounded steps, and sends complex ones to admins with an AI copilot. A ticket can be resolved
+when the customer confirms a fix or when an admin records a resolution note. Resolved cases become searchable;
+new canonical knowledge-base articles require admin review before publication.
 
 This document covers the system, the main flows, the algorithms behind each decision, how it scales, and the
 alternatives that were considered.
@@ -297,7 +298,7 @@ An embedding-model change is a blue/green rebuild into new Qdrant collections, f
    in support: a fix that used to work and no longer does.
 8. **Rate limits are a scheduling problem, not an outage.** The first live eval ran 3-way concurrent and hit
    Gemini's 15 RPM and Groq's 8k TPM. Breakers opened and 70% of cases degraded. Client-side RPM/TPM pacing,
-   429 cooldowns that bypass the breaker, and four-model chains fixed it (see the issues log, P6-005).
+   429 cooldowns that bypass the breaker, and four-model chains addressed it in the development evaluation.
 9. **Model per role, chosen by evidence.** Flash-Lite triages quickly. For drafting, Groq gpt-oss-120b is
    primary because Gemini drafts hit truncation and recitation stops on roughly half of the calls during
    testing. The judge is a different model family (qwen3.8) to avoid self-grading.

@@ -1,152 +1,117 @@
-# Resolve Desk: telecom support resolution assistant
+# Resolve Desk
 
-A full-stack telecom support system that works out what is wrong with a few well-chosen questions,
-**fixes simple and recurring issues itself** with grounded, cited steps, **sends complex ones to a human**
-with an AI copilot, keeps every ticket **open until the customer confirms the fix**, and adds each
-confirmed resolution to the knowledge base.
+Resolve Desk is a telecom support assistant for customers and admins. It turns a customer's complaint into an issue classification, retrieves similar **resolved** cases and published knowledge-base (KB) guidance, and drafts cited troubleshooting steps. Safe, recurring issues can be tried by the customer; sensitive, severe, or poorly supported issues go to an admin. Tickets retain the conversation, attempted steps, and outcome so a confirmed fix can improve future searches.
 
-- Backend: Python, FastAPI.
-- Frontend: React (JavaScript/JSX) with Vite, styled to the Coinbase-derived design system in `DESIGN-coinbase.md`.
-- Hosted services, all on free tiers: Gemini, Groq, Jina, Qdrant Cloud, Neon Postgres, Upstash Redis,
-  Langfuse.
-- The same code also runs fully offline.
+The application is **one deployable FastAPI service with a React interface**, organized into intake, retrieval, AI, ticket, and insights modules. It uses external model, vector, and database services when configured. It does not require a separate notification service: updates appear in the ticket dashboard and live event stream.
 
+## What happens to a complaint
 
->
-> Architecture, algorithms, scaling and design decisions: **[docs/architecture.md](docs/architecture.md)** ·
-> Product requirements: `../docs/PRD.md` · Problem log: [docs/issues-and-errors.md](docs/issues-and-errors.md)
+1. A customer registers or signs in, chooses an issue area, and answers adaptive questions when more detail would help. The ticket is saved **before** AI analysis begins.
+2. The backend masks common personal identifiers for AI processing. Hybrid search retrieves similar resolved tickets and published KB sections. Unresolved tickets cannot supply resolution evidence.
+3. When an LLM provider is configured, it classifies intent, product, severity, and sentiment and drafts steps from the retrieved evidence. Code validates citation IDs, filters unsupported promises, and restricts customer actions to approved self-help guidance. Provider failures trigger conservative fallbacks.
+4. The routing policy chooses **self-service** (safe steps for a confident, recurring low-severity issue), **assisted** (customer-safe steps while an admin reviews), or **human** (admin owns the issue). P1, sensitive, unknown, injection-like, and insufficient-evidence cases take the human route. Where reviewed public KB text supports it, an admin-owned ticket may still show brief, read-only precautions.
+5. The customer sees their ticket status, conversation, suggested steps, and privacy-safe evidence for AI steps. Admins see the full cited KB articles and past resolved cases, internal diagnostic steps, the ticket history, and a Copilot brief. **Deep Analysis** lets an admin examine another retrieval and draft result without losing it when opening a source.
+6. Step outcomes can escalate the same ticket. Admins can ask questions, send messages, and propose a fix. The customer confirms success or reopens the ticket; an admin can also resolve it with a written note. Resolution learning indexes a searchable case and proposes a KB draft when guidance is missing. An admin must review that draft before publication.
 
-## What it does
+**Example:** “My broadband drops each evening; restarting the router did not help.” Intake records the prior restart. Retrieval finds related resolved cases and the broadband guide. If the evidence supports a customer-safe check, the customer may be asked to compare a wired connection with Wi-Fi, with a guide excerpt shown beside the step. If the connection still fails, the ticket moves to the admin queue with the attempted steps attached. The admin can inspect the cited case, ask a question, propose a fix, and receive the customer's confirmation.
 
-| | Customer | Admin |
-|---|---|---|
-| **Intake** | Swiggy-style chips (area → issue → "something else"), then 0-3 adaptive questions picked by **expected information gain**, with a live "what we think it is" panel | Sees every answer and how many bits of uncertainty it removed |
-| **Routing** | Simple and recurring issues get steps right away. P2 and borderline issues get safe steps **and** an admin. P1 and sensitive issues stay with an admin; when evidence supports it, customers see up to two read-only precautions from reviewed public KB sections. Unclear cases stay with an admin without invented steps. | Each decision lists its reasons: recurrence, confidence, severity drivers, safety blockers |
-| **Steps** | Fix steps have **Tried - worked / Tried - didn't work** and a **side chat for each step**. All self-service steps failing escalates automatically. Admin-owned tickets may show read-only, cited precautions without fix feedback. | Sees each fix step's outcome, notes and step chat. Outcomes re-weight retrieval and feed solution-drift alerts. |
-| **Conversation** | Thread with **quick-reply choices** when support asks a question | Ask for info with options, reply, add internal notes, propose a fix, resolve with a note |
-| **Lifecycle** | Ticket stays live; "still not working" **reopens the same ticket**; rate the support | Queue sorted by severity and SLA; claim; **copilot** shows similar incidents, root causes, next actions (excluding what failed), questions and a reply draft. Citation links open full admin-only ticket or KB records. **Deep Analysis** opens from Copilot with that complaint filled in and runs a fresh analysis. |
-| **Updates** | Ticket status, messages and incident notices appear in the dashboard | Stored ticket timeline and live event stream |
-| **Learning** | Resolution summary on the ticket | The whole process is summarised and indexed as a searchable case immediately; novel fixes become KB drafts for review |
-| **Drift** | n/a | PSI, out-of-distribution rate, centroid shift, unclassified rate, **solution drift** (fixes that stopped working), new-class discovery → taxonomy vN+1 |
-| **Novelty** | Outage-aware: "known issue in your area" | **Incident radar** groups similar tickets from one area into an incident; resolve once for everyone |
+Incident Radar separately groups similar recent complaints in one area. The admin sees the incident; linked customers see an in-app notice on their tickets. Resolving an incident proposes a check on each linked open ticket. The system does **not** send email notifications.
 
-## Quick start (Windows PowerShell, macOS or Linux)
+## Stack
 
-```bash
-# 1. Python backend
+| Layer | Technology |
+|---|---|
+| Web interface | React 18, JavaScript/JSX, Vite |
+| API and domain logic | Python 3.11+, FastAPI, Pydantic, SQLAlchemy |
+| System of record | PostgreSQL (Neon when hosted); SQLite locally |
+| Search | Qdrant dense + BM25 sparse retrieval, fusion and optional reranking; local index fallback |
+| AI providers | Configurable Gemini and Groq chains; optional Anthropic. Jina embeddings/reranker when configured |
+| Caching and observability | Upstash Redis or in-memory fallback; Prometheus-format metrics and optional Langfuse traces |
+| Operations | Docker, Render blueprint, GitHub Actions |
+
+Authentication uses HttpOnly sessions, server-side customer/admin role checks, ticket ownership checks, and CSRF protection. Server-Sent Events update open dashboards; stored ticket events and messages remain available when a user returns.
+
+For diagrams and design details, see [Architecture](docs/architecture.md).
+
+## Dataset
+
+The repository includes an **original synthetic, English-only** dataset:
+
+| File | Count | Used for |
+|---|---:|---|
+| Resolved historical tickets | 264 | Searchable resolution evidence |
+| Unresolved historical tickets | 132 | Intake/discovery data; excluded from resolution evidence |
+| KB articles | 22 | Published guidance after seeding |
+| Held-out evaluation complaints | 74 | Evaluation inputs, never indexed |
+| Update events | 5 | Version and status-change scenarios |
+
+The 22 issue families cover broadband, fiber, Wi-Fi, mobile, SIM/eSIM, billing, plan changes, porting, and TV. Each has 12 resolved tickets, 6 unresolved tickets, and 3 answerable evaluation complaints; 8 additional evaluation complaints are designed to require abstention. Labels and outcomes are generated scenario data, not observed customer outcomes. See the [dataset description](data/synthetic/v1/README.md) and run `python scripts/validate_telecom_dataset.py` to check counts, references, status boundaries, and exact train/evaluation separation.
+
+## Run locally
+
+Prerequisites: **Python 3.11+** and **Node.js 22+**. Copy `.env.example` to `.env`. API keys are optional for a local degraded demo: SQLite, a local vector index, hash embeddings, and memory cache are used when hosted providers are absent. Without an LLM key, tickets still save and route to an admin; AI drafts require a configured model.
+
+**Windows PowerShell**
+
+```powershell
 python -m venv .venv
-.venv/Scripts/python -m pip install -e ".[dev]"      # macOS/Linux: .venv/bin/python
-cp .env.example .env                                       # add API keys (all optional; see below)
-
-# 2. Check providers, load the corpus, create demo users + tickets
-.venv/Scripts/python -m telecom_assistant.cli check-keys
-.venv/Scripts/python -m telecom_assistant.cli seed --demo --demo-tickets 6   # prints the demo password
-
-# 3. Build the React app and run everything on one port
-cd frontend && npm ci && npm run build && cd ..
-.venv/Scripts/python -m uvicorn telecom_assistant.main:app --port 8000
+.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+Copy-Item .env.example .env
+.\.venv\Scripts\python.exe -m telecom_assistant.cli seed --demo --demo-tickets 6
+Push-Location frontend
+npm ci
+npm run build
+Pop-Location
+.\.venv\Scripts\python.exe -m uvicorn telecom_assistant.main:app --host 127.0.0.1 --port 8000
 ```
 
-Open `http://localhost:8000`. The demo accounts are `customer@resolvedesk.dev` and `admin@resolvedesk.dev`. Their
-password is `DEMO_PASSWORD` in `.env`, or whatever `seed --demo` prints. API docs are at `/docs`.
-
-For UI development, run `npm run dev` in `frontend/` (port 5173, proxied to the API on 8000). Use
-`docker compose up --build` to run the API and React app in one container.
-
-**No keys?** Leave `.env` empty and the system runs offline: SQLite, an in-memory vector index, a deterministic
-hash embedder and memory cache. AI features need at least one LLM key (Gemini
-or Groq). Without one, tickets still save and go to a human.
-
-## Requirements → where they live
-
-| Requirement | Code |
-|---|---|
-| Classify; AI resolves simple/recurring, humans the rest | `ai/resolver.py::route`, `ai/triage.py` |
-| Ticket and incident updates | `tickets/desk.py`, `tickets/events.py`, customer and admin dashboards |
-| Update the same ticket; live until solved | `tickets/lifecycle.py`, `tickets/desk.py` (`customer_confirm`, `_reopen`, `propose_solution`) |
-| Resolved → summary into knowledge base | `tickets/desk.py::learn`, `ai/assistants.py::Summarizer`, `knowledge/indexer.py` |
-| AI suggestions for escalated tickets | `ai/assistants.py::Copilot`, `tickets/desk.py::refresh_copilot` |
-| Questions (MCQ / free text) to narrow the problem | `ai/clarify.py`, `resources/questions.json` |
-| Step checkboxes + per-step side chat | `tickets/desk.py::step_feedback/step_chat`, `frontend/src/pages/customer/Tickets.jsx` |
-| Customer ↔ admin messages, choices for unclear complaints | `desk.py::admin_message/customer_message`, `NewTicket.jsx`, `Chat.jsx` |
-| Data drift | `insights/drift.py`, `insights/discovery.py`, `knowledge/taxonomy.py`, `cli.py reindex` |
-
-## Evaluation and system health
-
-`telecom-assistant eval` runs the 74 held-out cases (never indexed) through the real pipeline. It writes
-`reports/eval_<timestamp>.{md,json}` and stores the run, which the admin **System health → Evaluation** tab
-displays. It reports:
-
-- triage F1 and P1 recall;
-- the retrieval ablation (dense / sparse / hybrid / +rerank);
-- clarification accuracy before vs after questions, using an oracle customer;
-- unsafe-route count and abstention precision/recall;
-- citation validity and LLM-judged step support;
-- per-stage latency and degraded-mode rates.
-
-### Previous evaluation ([`reports/eval_20261003_195637.md`](reports/eval_20261003_195637.md), hosted stack, 56-case English synthetic held-out set)
-
-These numbers predate the 22-family, 74-case corpus. Re-run the evaluation before making accuracy claims about the expanded data.
-
-| Metric | Result | Target |
-|---|---|---|
-| Intent macro-F1 | **1.000** | ≥ 0.80 |
-| Product accuracy | **100%** | ≥ 90% |
-| P1 recall | **100%** | ≥ 95% |
-| Severity macro-F1 | 0.544 | ≥ 0.70 (P2/P3 boundary misses) |
-| Unsafe self-service routes (P1 or unanswerable) | **0** | 0 |
-| Citation validity / LLM-judged step support | **100% / 100%** (33 steps) | 100% / ≥ 90% |
-| Abstention precision / recall | 66.7% / **100%** | ≥ 85% recall |
-| KB Recall@5: dense / sparse / hybrid / hybrid + rerank | 0.979 / 0.812 / 0.958 / **0.979** | ≥ 0.85 |
-| Intent accuracy: complaint only → after adaptive questions | 93.8% → **100%** (3.6 questions, 1.56 bits) | n/a |
-| End-to-end latency p50 / p95 | 5.4 s / 27.3 s | ≤ 8 s p95 |
-| Degraded-mode rate | **0%** | < 5% |
-
-The p95 latency comes from free-tier per-minute limits (15 RPM Gemini, 8k TPM Groq): the gateway paces calls and
-fails over to slower backup models rather than failing (see issue P6-005). Severity is the weakest metric:
-critical outages are always caught, but medium vs low priority (P2/P3) is often off by one level.
-
-At runtime:
-
-- `/metrics` exposes Prometheus metrics;
-- `/ready` checks the database, vector store and cache;
-- LLM generations are traced to Langfuse;
-- the admin **Health** page shows provider quota meters, circuit breakers, latency and evaluation runs.
-
-## Tests
+**macOS / Linux**
 
 ```bash
-.venv/Scripts/python -m pytest -q          # no network: fake LLM, hash embedder, local index, SQLite
-.venv/Scripts/python -m ruff check src tests
+python3 -m venv .venv
+.venv/bin/python -m pip install -e ".[dev]"
+cp .env.example .env
+.venv/bin/python -m telecom_assistant.cli seed --demo --demo-tickets 6
+(cd frontend && npm ci && npm run build)
+.venv/bin/python -m uvicorn telecom_assistant.main:app --host 127.0.0.1 --port 8000
+```
+
+Open **http://127.0.0.1:8000**; API documentation is at **/docs**. The seed command creates demo accounts `customer@resolvedesk.dev` and `admin@resolvedesk.dev` and prints their password when first created. Set `DEMO_PASSWORD` in `.env` before seeding if you want a repeatable password. For frontend development, run `npm run dev` inside `frontend/`; Vite serves port 5173 and proxies API requests to port 8000.
+
+To create an admin without demo accounts, run `python -m telecom_assistant.cli create-user --email you@example.com --role admin` using the environment where the backend is installed; the CLI prompts for a password. For a container run, use `docker compose up --build` after creating `.env`. Hosted setup and data-import steps are in [Deployment](docs/DEPLOYMENT.md).
+
+## Tests and evaluation
+
+```bash
+python -m pytest -q
+python -m ruff check src tests
+python scripts/validate_telecom_dataset.py
 cd frontend && npm run build
 ```
 
-CI (`.github/workflows/ci.yml`) runs lint, tests, dataset validation, the frontend build and a Docker build.
-The nightly workflow runs the live eval, a drift snapshot and discovery against the hosted stack.
+The Python tests use a deterministic fake LLM, SQLite, a hash embedder, and a local vector index, so they run without external API calls. They cover routing and P1 safeguards, citation and privacy gates, authentication/CSRF, the customer–admin lifecycle, learning and restart recovery, provider failure behavior, incident grouping, versioned indexing, and drift signals. GitHub [CI](.github/workflows/ci.yml) also runs lint, tests, dataset validation, frontend build, and a Docker build on pushes and pull requests.
 
-## Repository layout
+The [saved hosted evaluation report](reports/eval_20261003_195637.md) used the **earlier 56-case** synthetic set (48 answerable, 8 expected abstentions). It reported intent macro-F1 **1.000**, P1 recall **100%**, severity macro-F1 **0.544**, KB Recall@5 **0.979** with hybrid search and reranking, and median/p95 analysis latency **5.4 s / 27.3 s**. It routed 36 cases to human and 20 to assisted, with **no self-service cases** in that run. These results do not establish self-service safety or accuracy on the current 74-case set. A fresh hosted evaluation is needed before making claims about the expanded dataset. The [nightly workflow](.github/workflows/nightly.yml) is configured to run live evaluation, drift, and discovery when its secrets are supplied.
+
+## Operational limits
+
+- The data is synthetic and shares issue templates across training and evaluation. No production accuracy or real-world fix rate has been established.
+- The application accepts free-text complaints; a dedicated pre-submission relevance filter for irrelevant text has not been implemented. Unknown or weak-evidence cases route conservatively to an admin and may enter the discovery pool.
+- Customer evidence is privacy-filtered, but PII detection is regex-based. Do not use real customer data with third-party providers without suitable agreements and additional review.
+- Live events use an in-process bus. Multiple API replicas would need shared pub/sub; the UI can also reload stored ticket data.
+- Background resolution learning resumes unfinished work on startup, but it is not a durable external job system. There are no email or off-app notifications.
+- The current automated Incident Radar test covers grouping; it does not prove end-to-end delivery to every linked customer screen.
+
+## Repository map
 
 ```text
-src/telecom_assistant/
-  api/            FastAPI app (REST + SSE + SPA), auth/RBAC/CSRF
-  tickets/        state machine, store, SupportDesk orchestrator, live event bus
-  ai/             clarify (information gain), triage, resolver (grounding + routing), copilot/summarizer/step chat, prompts
-  knowledge/      indexer (versioned, idempotent), hybrid retriever, taxonomy registry
-  gateways/       LLM chain (breaker, quota), Jina embed/rerank (hash cache), Qdrant/local index, Upstash KV
-  insights/       drift, discovery, incident radar, KPIs
-  resources/      taxonomy seed, question bank, customer self-help KB sections
-  evaluation.py   eval harness + markdown report
-frontend/         React + Vite, JavaScript/JSX (customer portal and admin console)
-data/synthetic/v1 synthetic corpus, held-out eval cases, update events
-docs/             architecture, phase records, issues log
+src/telecom_assistant/api/       FastAPI routes, authentication and access control
+src/telecom_assistant/tickets/   Ticket lifecycle, persistence, orchestration and live events
+src/telecom_assistant/ai/        Intake, triage, cited resolution, Copilot and summarization
+src/telecom_assistant/knowledge/ Indexing, retrieval, source details and taxonomy
+src/telecom_assistant/insights/  Incident Radar, drift and discovery
+src/telecom_assistant/gateways/  Model, embedding, vector and cache integrations
+frontend/src/                   Customer and admin interface
+data/synthetic/v1/              Synthetic corpus and held-out evaluation inputs
+tests/                          Offline regression suite
 ```
-
-## Data and privacy
-The current synthetic corpus has 264 resolved and 132 unresolved tickets across 22 English-language issue families (see `data/synthetic/v1/README.md`). Only verified resolved cases enter the resolution index. Complaints are PII-redacted
-before any LLM, embedding, trace or log call. Free-tier providers may use submitted data, so real customer data
-must not be used without paid, no-training agreements. Never share passwords, OTPs or full card numbers in
-tickets.
-
-### Suggested intake guard for irrelevant complaints
-
-A future pre-submission relevance check should classify the description as a service issue, unclear request, or clearly unrelated text. For unclear or unrelated text, ask for the affected service, observable symptom, and when it started, then let the customer revise or continue to an admin. Never silently discard a plausible complaint or let an unverified one become resolution evidence. Keep emergency and accessibility reports on a direct admin path. This guard is a recommendation; the current intake still accepts free text and uses adaptive questions plus conservative routing.
