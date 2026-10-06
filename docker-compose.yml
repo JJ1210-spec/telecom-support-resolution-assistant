@@ -1,7 +1,95 @@
-# FastAPI serves the API and the built React app.
+# Local three-service topology. Only the gateway binds a host port.
+x-store: &store
+  DATABASE_URL: postgresql://resolvedesk:resolvedesk@postgres:5432/resolvedesk
+  QDRANT_URL: http://qdrant:6333
+  VECTOR_BACKEND: qdrant
+  EMBED_PROVIDER: ${EMBED_PROVIDER:-hash}
+  HASH_QDRANT: "true"
+  COLLECTION_SUFFIX: ${COLLECTION_SUFFIX:-compose_v1}
+
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: resolvedesk
+      POSTGRES_USER: resolvedesk
+      POSTGRES_PASSWORD: resolvedesk
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U resolvedesk -d resolvedesk"]
+      interval: 5s
+      retries: 10
+    volumes: ["postgres_data:/var/lib/postgresql/data"]
+
+  qdrant:
+    image: qdrant/qdrant:v1.13.6
+    volumes: ["qdrant_data:/qdrant/storage"]
+
+  triage:
+    build:
+      context: .
+      dockerfile: services/triage/Dockerfile
+    environment:
+      <<: *store
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      JINA_API_KEY: ${JINA_API_KEY:-}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?Set INTERNAL_SERVICE_TOKEN in .env}
+    depends_on:
+      postgres: { condition: service_healthy }
+      qdrant: { condition: service_started }
+    restart: unless-stopped
+
+  resolution:
+    build:
+      context: .
+      dockerfile: services/resolution/Dockerfile
+    environment:
+      <<: *store
+      TRIAGE_SERVICE_URL: http://triage:8001
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      JINA_API_KEY: ${JINA_API_KEY:-}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?Set INTERNAL_SERVICE_TOKEN in .env}
+    depends_on:
+      triage: { condition: service_healthy }
+    restart: unless-stopped
+
+  discovery:
+    build:
+      context: .
+      dockerfile: services/discovery/Dockerfile
+    environment:
+      <<: *store
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      JINA_API_KEY: ${JINA_API_KEY:-}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?Set INTERNAL_SERVICE_TOKEN in .env}
+    depends_on:
+      resolution: { condition: service_healthy }
+    restart: unless-stopped
+
   api:
     build: .
-    env_file: .env
+    environment:
+      <<: *store
+      TRIAGE_SERVICE_URL: http://triage:8001
+      RESOLUTION_SERVICE_URL: http://resolution:8002
+      DISCOVERY_SERVICE_URL: http://discovery:8003
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?Set INTERNAL_SERVICE_TOKEN in .env}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      JINA_API_KEY: ${JINA_API_KEY:-}
     ports: ["8000:8000"]
+    depends_on:
+      resolution: { condition: service_healthy }
+      discovery: { condition: service_healthy }
     restart: unless-stopped
+
+volumes:
+  postgres_data:
+  qdrant_data:

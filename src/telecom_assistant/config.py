@@ -40,6 +40,7 @@ class Settings:
     qdrant_url: str = ""
     qdrant_api_key: str = ""
     collection_suffix: str = "v1"
+    hash_qdrant: bool = False
 
     # Providers
     gemini_api_key: str = ""
@@ -93,6 +94,10 @@ class Settings:
     allowed_origins: list[str] = field(default_factory=list)
     frontend_dist: Path = ROOT / "frontend" / "dist"
     cache_ttl_s: int = 3600
+    triage_service_url: str = ""
+    resolution_service_url: str = ""
+    discovery_service_url: str = ""
+    internal_service_token: str = ""
 
     @classmethod
     def from_env(cls, env_file: Path | None = None, **overrides) -> Settings:
@@ -108,6 +113,7 @@ class Settings:
             qdrant_url=qdrant_url.rstrip("/"),
             qdrant_api_key=_env("QDRANT_API_KEY"),
             collection_suffix=_env("COLLECTION_SUFFIX", cls.collection_suffix),
+            hash_qdrant=_env("HASH_QDRANT").casefold() in ("1", "true", "yes"),
             gemini_api_key=_env("GEMINI_API_KEY"),
             groq_api_key=_env("GROQ_API_KEY"),
             anthropic_api_key=_env("ANTHROPIC_API_KEY"),
@@ -147,6 +153,10 @@ class Settings:
             runtime_dir=Path(_env("RUNTIME_DIR", ".runtime")),
             allowed_origins=_chain("ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"),
             cache_ttl_s=_int("CACHE_TTL_S", cls.cache_ttl_s),
+            triage_service_url=_env("TRIAGE_SERVICE_URL").rstrip("/"),
+            resolution_service_url=_env("RESOLUTION_SERVICE_URL").rstrip("/"),
+            discovery_service_url=_env("DISCOVERY_SERVICE_URL").rstrip("/"),
+            internal_service_token=_env("INTERNAL_SERVICE_TOKEN"),
         )
         values.update(overrides)
         return cls(**values)

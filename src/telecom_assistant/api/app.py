@@ -20,6 +20,7 @@ from ..db import eval_runs, incidents, traces
 from ..gateways.kv import rate_limited
 from ..insights.stats import overview
 from ..knowledge.details import source_detail
+from ..microservices.clients import ServiceUnavailable
 from ..services import Services, build_services
 from ..telemetry import configure_logging, log_event, metrics
 from ..tickets.desk import Forbidden, NotFound, SupportDesk
@@ -190,6 +191,10 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
     @app.exception_handler(Forbidden)
     async def _fb(_: Request, exc: Forbidden):
         return JSONResponse({"detail": str(exc)}, status_code=403)
+
+    @app.exception_handler(ServiceUnavailable)
+    async def _su(_: Request, exc: ServiceUnavailable):
+        return JSONResponse({"detail": str(exc)}, status_code=503)
 
     @app.exception_handler(InvalidTransition)
     async def _it(_: Request, exc: InvalidTransition):

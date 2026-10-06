@@ -2,7 +2,7 @@
 
 Resolve Desk is a telecom support assistant for customers and admins. It turns a customer's complaint into an issue classification, retrieves similar **resolved** cases and published knowledge-base (KB) guidance, and drafts cited troubleshooting steps. Safe, recurring issues can be tried by the customer; sensitive, severe, or poorly supported issues go to an admin. Tickets retain the conversation, attempted steps, and outcome so a confirmed fix can improve future searches.
 
-The application is **one deployable FastAPI service with a React interface**, organized into intake, retrieval, AI, ticket, and insights modules. It uses external model, vector, and database services when configured. It does not require a separate notification service: updates appear in the ticket dashboard and live event stream.
+The live Render demo remains **one deployable FastAPI service with a React interface**. The repository also contains an optional three-service deployment for triage, resolution, and data evolution, connected to the same customer/admin gateway through versioned HTTP APIs. Those changes have not been deployed to the linked demo. Both modes use the same analysis implementation; the three-service mode is covered by direct-versus-HTTP parity tests. Updates appear in the ticket dashboard and live event stream.
 
 ## Live demo
 
@@ -54,7 +54,7 @@ After signing in as an admin, these areas show how the system reaches and checks
 
 Authentication uses HttpOnly sessions, server-side customer/admin role checks, ticket ownership checks, and CSRF protection. Server-Sent Events update open dashboards; stored ticket events and messages remain available when a user returns.
 
-For diagrams and design details, see [Architecture](docs/architecture.md).
+For the deployed design, see [Architecture](docs/architecture.md). The [three-service architecture](docs/microservices.md) documents service contracts, deployment steps, failure behavior, and remaining gateway dependencies.
 
 ## Architecture Diagram
 

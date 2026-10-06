@@ -87,6 +87,7 @@ class Discovery:
         vectors = np.stack([bytes_to_vec(r.embedding) for r in rows])
         clusters = [c for c in agglomerate(vectors, threshold) if len(c) >= min_size]
         proposals = []
+        pending_naming = 0
         classes = self.registry.by_intent()
         for members in clusters:
             member_rows = [rows[i] for i in members]
@@ -100,6 +101,9 @@ class Discovery:
             nearest_sim = nearest.tickets[0]["similarity"] if nearest.tickets else 0.0
             examples = [r.text[:300] for r in member_rows[:6]]
             proposal = await self._name(examples, classes)
+            if proposal is None:
+                pending_naming += 1
+                continue
             if proposal["intent"] in classes:
                 proposal["intent"] = proposal["intent"] + ".variant"
             proposal_id = f"prop_{uuid.uuid4().hex[:10]}"
@@ -112,15 +116,12 @@ class Discovery:
                             .values(proposal_id=proposal_id))
             proposals.append({"id": proposal_id, **proposal, "size": len(members), "cohesion": round(cohesion, 3),
                               "nearest_intent": nearest_intent})
-        return {"pooled": len(rows), "clusters": len(clusters), "proposals": proposals}
+        return {"pooled": len(rows), "clusters": len(clusters), "proposals": proposals,
+                "pending_naming": pending_naming, "degraded": ["discovery_llm_unavailable"] if pending_naming else []}
 
-    async def _name(self, examples: list[str], classes: dict[str, dict]) -> dict:
-        fallback_words = re.findall(r"[a-z]{4,}", " ".join(examples).casefold())[:3] or ["new", "issue"]
-        fallback = {"intent": "emerging." + "_".join(fallback_words), "label": "Emerging issue: " + " ".join(
-            fallback_words), "description": "Cluster of complaints that do not match existing classes.",
-            "product": "Unknown", "category": "Technical Support", "area": "internet"}
+    async def _name(self, examples: list[str], classes: dict[str, dict]) -> dict | None:
         if self.llm is None:
-            return fallback
+            return None
         system = ("You name a NEW telecom support issue class from example complaints that did not fit the existing "
                   "taxonomy. intent is a dotted snake_case id like 'domain.short_name'. label is a short customer-"
                   f"friendly phrase. area must be one of {list(AREAS)}. Return JSON with keys intent, label, "
@@ -130,7 +131,7 @@ class Discovery:
         try:
             result = await self.llm.json("assist", system, user, ProposalOut, max_tokens=400, name="discovery.name")
         except LLMUnavailable:
-            return fallback
+            return None
         data = result.data
         data["intent"] = re.sub(r"[^a-z0-9_.]", "_", data["intent"].casefold())[:80]
         if data["area"] not in AREAS:

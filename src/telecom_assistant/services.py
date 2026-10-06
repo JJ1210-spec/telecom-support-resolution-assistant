@@ -49,11 +49,12 @@ class Services:
     incidents: IncidentRadar
     discovery: Discovery
     drift: DriftMonitor
+    resolution_client: object | None = None
 
 
 def build_services(settings: Settings, *, db: Database | None = None, llm: LLMGateway | None | bool = True,
                    embedder=None, index=None, reranker: Reranker | None | bool = True,
-                   kv: MemoryKV | UpstashKV | None = None) -> Services:
+                   kv: MemoryKV | UpstashKV | None = None, remote: bool = True) -> Services:
     db = db or Database(settings.sqlalchemy_url)
     db.create_all()
     kv = kv or build_kv(settings.upstash_redis_url, settings.upstash_redis_token)
@@ -73,7 +74,8 @@ def build_services(settings: Settings, *, db: Database | None = None, llm: LLMGa
     elif reranker is False:
         reranker = None
     if index is None:
-        if settings.vector_backend == "qdrant" and settings.qdrant_url and isinstance(embedder, JinaEmbedder):
+        if (settings.vector_backend == "qdrant" and settings.qdrant_url
+                and (isinstance(embedder, JinaEmbedder) or settings.hash_qdrant)):
             index = QdrantIndex(settings.qdrant_url, settings.qdrant_api_key, settings.collection_suffix)
         else:
             index = LocalIndex()
@@ -102,7 +104,7 @@ def build_services(settings: Settings, *, db: Database | None = None, llm: LLMGa
                                  "intent": chunk["intent"], "product": chunk["product"], "origin": chunk["origin"]})
         return sections
 
-    return Services(
+    services = Services(
         settings=settings, db=db, kv=kv, langfuse=langfuse, llm=llm, embedder=embedder, reranker=reranker,
         index=index, indexer=indexer, retriever=retriever, registry=registry,
         clarify=ClarifyEngine(settings, registry, retriever), triager=Triager(llm),
@@ -110,6 +112,18 @@ def build_services(settings: Settings, *, db: Database | None = None, llm: LLMGa
         step_chat=StepChat(llm), incidents=IncidentRadar(settings, db),
         discovery=Discovery(db, registry, retriever, llm), drift=DriftMonitor(settings, db),
     )
+    if remote:
+        from .microservices.clients import RemoteClarify, RemoteDiscovery, RemoteDrift, RemoteResolution
+
+        if settings.triage_service_url:
+            services.clarify = RemoteClarify(settings.triage_service_url, settings.internal_service_token)
+        if settings.resolution_service_url:
+            services.resolution_client = RemoteResolution(settings.resolution_service_url,
+                                                          settings.internal_service_token)
+        if settings.discovery_service_url:
+            services.discovery = RemoteDiscovery(settings.discovery_service_url, settings.internal_service_token)
+            services.drift = RemoteDrift(settings.discovery_service_url, settings.internal_service_token)
+    return services
 
 
 def as_vector(values) -> list[float] | None:

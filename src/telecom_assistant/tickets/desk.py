@@ -152,6 +152,8 @@ class SupportDesk:
     async def run_analysis(self, redacted: str, intake: dict | None, product_hint: str | None, trace_id: str,
                            progress=None) -> dict:
         """Stateless analysis used by tickets, the admin playground and the eval harness."""
+        if self.s.resolution_client is not None:
+            return await self.s.resolution_client.analyze(redacted, intake, product_hint, trace_id, progress)
         timer = Timer()
         degraded: list[str] = []
         progress = progress or (lambda stage: None)
