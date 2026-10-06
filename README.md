@@ -46,8 +46,8 @@ After signing in as an admin, these areas show how the system reaches and checks
 |---|---|
 | Web interface | React 18, JavaScript/JSX, Vite |
 | API and domain logic | Python 3.11+, FastAPI, Pydantic, SQLAlchemy |
-| System of record | PostgreSQL (Neon when hosted); SQLite locally |
-| Search | Qdrant dense + BM25 sparse retrieval, fusion and optional reranking; local index fallback |
+| System of record | PostgreSQL (Neon when hosted); SQLite in offline mode |
+| Search | Qdrant dense + BM25 sparse retrieval, fusion and optional reranking; in-memory index fallback |
 | AI providers | Configurable Gemini and Groq chains; optional Anthropic. Jina embeddings/reranker when configured |
 | Caching and observability | Upstash Redis or in-memory fallback; Prometheus-format metrics and optional Langfuse traces |
 | Operations | Docker, Render blueprint, GitHub Actions |
@@ -63,11 +63,11 @@ flowchart LR
   C[Customer] --> UI[React interface]
   A[Admin] --> UI
   UI <--> API[FastAPI application]
-  API --> DB[(PostgreSQL or local SQLite)]
+  API --> DB[(PostgreSQL or SQLite)]
   API --> PIPE[Intake, triage, retrieval, resolution and routing]
   PIPE --> LLM[Gemini / Groq LLM gateway]
-  PIPE --> EMB[Jina or local embeddings]
-  PIPE <--> IDX[(Qdrant or local index)]
+  PIPE --> EMB[Jina or hash embeddings]
+  PIPE <--> IDX[(Qdrant or in-memory index)]
   API --> INS[Incident Radar, drift and discovery]
   INS --> DB
   API --> EVT[Ticket events and live updates]
@@ -91,39 +91,6 @@ The repository includes an **original synthetic, English-only** dataset:
 
 The 22 issue families cover broadband, fiber, Wi-Fi, mobile, SIM/eSIM, billing, plan changes, porting, and TV. Each has 12 resolved tickets, 6 unresolved tickets, and 3 answerable evaluation complaints; 8 additional evaluation complaints are designed to require abstention. Labels and outcomes are generated scenario data, not observed customer outcomes. See the [dataset description](data/synthetic/v1/README.md) and run `python scripts/validate_telecom_dataset.py` to check counts, references, status boundaries, and exact train/evaluation separation.
 
-## Run locally
-
-Prerequisites: **Python 3.11+** and **Node.js 22+**. Copy `.env.example` to `.env`. API keys are optional for a local degraded demo: SQLite, a local vector index, hash embeddings, and memory cache are used when hosted providers are absent. Without an LLM key, tickets still save and route to an admin; AI drafts require a configured model.
-
-**Windows PowerShell**
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
-Copy-Item .env.example .env
-.\.venv\Scripts\python.exe -m telecom_assistant.cli seed --demo --demo-tickets 6
-Push-Location frontend
-npm ci
-npm run build
-Pop-Location
-.\.venv\Scripts\python.exe -m uvicorn telecom_assistant.main:app --host 127.0.0.1 --port 8000
-```
-
-**macOS / Linux**
-
-```bash
-python3 -m venv .venv
-.venv/bin/python -m pip install -e ".[dev]"
-cp .env.example .env
-.venv/bin/python -m telecom_assistant.cli seed --demo --demo-tickets 6
-(cd frontend && npm ci && npm run build)
-.venv/bin/python -m uvicorn telecom_assistant.main:app --host 127.0.0.1 --port 8000
-```
-
-Open **http://127.0.0.1:8000**; API documentation is at **/docs**. The seed command creates demo accounts `customer@resolvedesk.dev` and `admin@resolvedesk.dev` and prints their password when first created. Set `DEMO_PASSWORD` in `.env` before seeding if you want a repeatable password. For frontend development, run `npm run dev` inside `frontend/`; Vite serves port 5173 and proxies API requests to port 8000.
-
-To create an admin without demo accounts, run `python -m telecom_assistant.cli create-user --email you@example.com --role admin` using the environment where the backend is installed; the CLI prompts for a password. For a container run, use `docker compose up --build` after creating `.env`. Hosted setup and data-import steps are in [Deployment](docs/DEPLOYMENT.md).
-
 ## Tests and evaluation
 
 ```bash
@@ -133,9 +100,9 @@ python scripts/validate_telecom_dataset.py
 cd frontend && npm run build
 ```
 
-The Python tests use a deterministic fake LLM, SQLite, a hash embedder, and a local vector index, so they run without external API calls. They cover routing and P1 safeguards, citation and privacy gates, authentication/CSRF, the customer–admin lifecycle, learning and restart recovery, provider failure behavior, incident grouping, versioned indexing, and drift signals. GitHub [CI](.github/workflows/ci.yml) also runs lint, tests, dataset validation, frontend build, and a Docker build on pushes and pull requests.
+The current regression suite uses a deterministic fake LLM, SQLite, a hash embedder, and an in-memory vector index, so it needs no external API calls. It covers routing and P1 safeguards, citation and privacy gates, authentication/CSRF, the customer–admin lifecycle, learning and restart recovery, provider failure behavior, incident grouping, versioned indexing, and drift signals. On 6 October 2026, `pytest` reported **31 passed** (two warnings), the dataset validator passed, and the React production build succeeded. GitHub [CI](.github/workflows/ci.yml) runs lint, tests, dataset validation, frontend build, and Docker build on pushes and pull requests.
 
-The [saved hosted evaluation report](reports/eval_20261003_195637.md) used the **earlier 56-case** synthetic set (48 answerable, 8 expected abstentions). It reported intent macro-F1 **1.000**, P1 recall **100%**, severity macro-F1 **0.544**, KB Recall@5 **0.979** with hybrid search and reranking, and median/p95 analysis latency **5.4 s / 27.3 s**. It routed 36 cases to human and 20 to assisted, with **no self-service cases** in that run. These results do not establish self-service safety or accuracy on the current 74-case set. A fresh hosted evaluation is needed before making claims about the expanded dataset. The [nightly workflow](.github/workflows/nightly.yml) is configured to run live evaluation, drift, and discovery when its secrets are supplied.
+The current evaluation corpus contains **74 held-out English complaints** across 22 issue families, including 8 cases designed to test abstention. The evaluator runs these through the configured retrieval and AI pipeline, writes a report, and stores the run for the admin console. The [nightly workflow](.github/workflows/nightly.yml) is configured to run evaluation, drift detection, and discovery when its hosted-service secrets are supplied. Run-specific accuracy figures appear in **System health → Evaluation** after an evaluation completes.
 
 ### Evals on System health
 
