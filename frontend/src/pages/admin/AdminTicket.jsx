@@ -2,10 +2,10 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../../api/client";
 import { Thread } from "../../components/Chat";
+import { AdminSourceLink } from "../../components/AdminSourceLink";
 import { Icon } from "../../components/Icon";
 import {
   ago,
-  Cite,
   ErrorNote,
   Meter,
   pct,
@@ -232,7 +232,7 @@ export default function AdminTicket() {
                     <div className="body-sm">
                       <strong>Probable cause:</strong> {decision.draft_meta.probable_root_cause.text}{" "}
                       {decision.draft_meta.probable_root_cause.citations.map((c) => (
-                        <Cite key={c} id={c} />
+                        <AdminSourceLink key={c} id={c} />
                       ))}
                     </div>
                   )}
@@ -391,7 +391,7 @@ export default function AdminTicket() {
                   {s.status_note && <div className="caption">“{s.status_note}”</div>}
                   <div>
                     {s.citations?.map((c) => (
-                      <Cite key={c} id={c} />
+                      <AdminSourceLink key={c} id={c} />
                     ))}
                   </div>
                   {stepChats(s.id).length > 0 && (
@@ -417,7 +417,7 @@ export default function AdminTicket() {
                         {s.text}
                         <br />
                         {s.citations?.map((c) => (
-                          <Cite key={c} id={c} />
+                          <AdminSourceLink key={c} id={c} />
                         ))}
                       </span>
                       {open && (
@@ -548,6 +548,7 @@ export default function AdminTicket() {
         {/* ---------------- copilot ---------------- */}
         <CopilotPanel
           copilot={t.copilot}
+          ticketId={t.id}
           busy={copilotBusy}
           canPlan={open}
           onRefresh={async () => {
@@ -642,7 +643,7 @@ function OptionsEditor({ options, setOptions }) {
     </div>
   );
 }
-function CopilotPanel({ copilot, busy, canPlan, onRefresh, onUsePlan, onAsk, onReply }) {
+function CopilotPanel({ copilot, ticketId, busy, canPlan, onRefresh, onUsePlan, onAsk, onReply }) {
   return (
     <section className="panel dark" aria-label="Copilot">
       <div className="panel-head plain">
@@ -692,7 +693,7 @@ function CopilotPanel({ copilot, busy, canPlan, onRefresh, onUsePlan, onAsk, onR
                   {c.text}{" "}
                   <span>
                     {c.citations.map((id) => (
-                      <Cite key={id} id={id} />
+                      <AdminSourceLink key={id} id={id} />
                     ))}
                   </span>
                 </div>
@@ -708,7 +709,7 @@ function CopilotPanel({ copilot, busy, canPlan, onRefresh, onUsePlan, onAsk, onR
                     {a.text}
                     <br />
                     {a.citations.map((id) => (
-                      <Cite key={id} id={id} />
+                      <AdminSourceLink key={id} id={id} />
                     ))}
                   </span>
                   {canPlan && (
@@ -760,9 +761,7 @@ function CopilotPanel({ copilot, busy, canPlan, onRefresh, onUsePlan, onAsk, onR
               {copilot.similar_incidents.map((s) => (
                 <details key={s.id} className="body-sm">
                   <summary style={{ cursor: "pointer" }}>
-                    <span className="mono" style={{ fontSize: 12 }}>
-                      {s.id}
-                    </span>{" "}
+                    <AdminSourceLink id={s.id} />{" "}
                     {s.title}{" "}
                     <span className="num caption" style={{ color: "var(--on-dark-soft)" }}>
                       {s.similarity?.toFixed(2)}
@@ -780,6 +779,7 @@ function CopilotPanel({ copilot, busy, canPlan, onRefresh, onUsePlan, onAsk, onR
                         <li key={x}>{x}</li>
                       ))}
                     </ol>
+                    <AdminSourceLink id={s.id}>Open full resolved case</AdminSourceLink>
                   </div>
                 </details>
               ))}
@@ -789,6 +789,10 @@ function CopilotPanel({ copilot, busy, canPlan, onRefresh, onUsePlan, onAsk, onR
             </div>
           </>
         )}
+        <Link className="btn btn-sm btn-dark" to={`/console/deep-analysis?ticket=${encodeURIComponent(ticketId)}`}
+          style={{ alignSelf: "flex-start" }}>
+          Deep Analysis <Icon name="arrow" size={14} />
+        </Link>
       </div>
     </section>
   );

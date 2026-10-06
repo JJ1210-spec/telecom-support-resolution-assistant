@@ -19,6 +19,7 @@ from ..config import Settings
 from ..db import eval_runs, incidents, traces
 from ..gateways.kv import rate_limited
 from ..insights.stats import overview
+from ..knowledge.details import source_detail
 from ..notify.service import create_notify_app
 from ..services import Services, build_services
 from ..telemetry import configure_logging, log_event, metrics
@@ -405,6 +406,13 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
     async def playground(data: AnalyzeIn, request: Request, user: dict = Depends(admin_write)) -> dict:
         await limit(request, "playground", 30, 600)
         return await desk.analyze_text(data.text, None, data.product_hint, data.use_cache)
+
+    @app.get("/v1/admin/sources", tags=["admin"])
+    async def admin_source(source_id: str, user: dict = Depends(admin_read)) -> dict:
+        detail = await asyncio.to_thread(source_detail, services.db, source_id)
+        if not detail:
+            raise HTTPException(404, "Source not found")
+        return detail
 
     @app.get("/v1/admin/traces/{trace_id}", tags=["admin"])
     def trace(trace_id: str, user: dict = Depends(admin_read)) -> dict:

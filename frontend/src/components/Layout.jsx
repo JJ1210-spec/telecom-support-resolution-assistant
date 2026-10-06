@@ -110,7 +110,7 @@ const CONSOLE_LINKS = [
   { to: "/console", label: "Overview", icon: "grid", section: "Support" },
   { to: "/console/queue", label: "Queue", icon: "inbox" },
   { to: "/console/incidents", label: "Incident radar", icon: "radar" },
-  { to: "/console/playground", label: "Playground", icon: "play" },
+  { to: "/console/deep-analysis", label: "Deep Analysis", icon: "play" },
   { to: "/console/knowledge", label: "Knowledge base", icon: "book", section: "Knowledge" },
   { to: "/console/taxonomy", label: "Taxonomy & discovery", icon: "tree" },
   { to: "/console/drift", label: "Data drift", icon: "pulse", section: "Reliability" },

@@ -318,6 +318,10 @@ table.table { width: 100%; border-collapse: collapse; font-size: 14px; }
   background: var(--surface-strong); font-family: var(--mono); font-size: 11px; color: var(--ink); cursor: default;
 }
 .cite.customer { background: var(--primary-tint); color: var(--primary); }
+.admin-source-link { display: inline-flex; color: inherit; text-decoration: none; }
+.admin-source-link.text { text-decoration: underline; }
+.admin-source-link .cite { cursor: pointer; }
+.admin-source-link:hover .cite, .admin-source-link:focus-visible .cite { text-decoration: underline; outline: 1px solid currentColor; }
 .timeline { position: relative; display: flex; flex-direction: column; gap: 14px; padding-left: 18px; }
 .timeline::before { content: ""; position: absolute; left: 4px; top: 6px; bottom: 6px; width: 1px; background: var(--hairline); }
 .tl-item { position: relative; font-size: 14px; }

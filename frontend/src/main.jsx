@@ -12,6 +12,7 @@ import { Login, Register } from "./pages/Auth";
 import NewTicket from "./pages/customer/NewTicket";
 import { CustomerInbox, InboxHome, TicketDetail } from "./pages/customer/Tickets";
 import AdminTicket from "./pages/admin/AdminTicket";
+import SourceDetail from "./pages/admin/SourceDetail";
 import { IncidentsPage, OverviewPage, PlaygroundPage, QueuePage } from "./pages/admin/Console";
 import { DriftPage, HealthPage, KnowledgePage, TaxonomyPage } from "./pages/admin/Admin";
 function Guard({ roles, children }) {
@@ -87,8 +88,10 @@ function App() {
         <Route index element={<OverviewPage />} />
         <Route path="queue" element={<QueuePage />} />
         <Route path="tickets/:id" element={<AdminTicket />} />
+        <Route path="sources/:sourceId" element={<SourceDetail />} />
         <Route path="incidents" element={<IncidentsPage />} />
-        <Route path="playground" element={<PlaygroundPage />} />
+        <Route path="deep-analysis" element={<PlaygroundPage />} />
+        <Route path="playground" element={<Navigate to="/console/deep-analysis" replace />} />
         <Route path="knowledge" element={<KnowledgePage />} />
         <Route path="taxonomy" element={<TaxonomyPage />} />
         <Route path="drift" element={<DriftPage />} />

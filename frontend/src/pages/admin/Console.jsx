@@ -1,12 +1,12 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../../api/client";
+import { AdminSourceLink } from "../../components/AdminSourceLink";
 import { Icon } from "../../components/Icon";
 import { ConsoleHead } from "../../components/Layout";
 import {
   ago,
   Bars,
-  Cite,
   Empty,
   ErrorNote,
   pct,
@@ -203,35 +203,68 @@ const SAMPLES = [
   "I need a guaranteed refund by tonight because my internet was slow yesterday.",
 ];
 export function PlaygroundPage() {
-  const [text, setText] = useState(SAMPLES[0]);
+  const [searchParams] = useSearchParams();
+  const ticketId = searchParams.get("ticket");
+  const [text, setText] = useState(ticketId ? "" : SAMPLES[0]);
   const [result, setResult] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
-  const run = async () => {
+  const request = useRef(0);
+  const editDraft = (value) => {
+    request.current++;
+    setBusy(false);
+    setText(value);
+    setResult(null);
+    setError(null);
+  };
+  useEffect(() => {
+    if (!ticketId) return;
+    const current = ++request.current;
+    setText("");
+    setResult(null);
     setBusy(true);
     setError(null);
+    api.get(`/v1/admin/tickets/${encodeURIComponent(ticketId)}`)
+      .then((ticket) => {
+        if (current !== request.current) return null;
+        setText(ticket.complaint);
+        return api.post("/v1/admin/analyze", { text: ticket.complaint, use_cache: false });
+      })
+      .then((analysis) => { if (analysis && current === request.current) setResult(analysis); })
+      .catch((err) => { if (current === request.current) setError(err instanceof Error ? err.message : "Failed"); })
+      .finally(() => { if (current === request.current) setBusy(false); });
+    return () => { request.current++; };
+  }, [ticketId]);
+  const run = async () => {
+    const current = ++request.current;
+    setBusy(true);
+    setError(null);
+    setResult(null);
     try {
-      setResult(await api.post("/v1/admin/analyze", { text, use_cache: false }));
+      const analysis = await api.post("/v1/admin/analyze", { text, use_cache: false });
+      if (current === request.current) setResult(analysis);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed");
+      if (current === request.current) setError(err instanceof Error ? err.message : "Failed");
     } finally {
-      setBusy(false);
+      if (current === request.current) setBusy(false);
     }
   };
   return (
     <div className="stack-lg">
-      <ConsoleHead eyebrow="Explainability" title="Analysis playground" />
+      <ConsoleHead eyebrow="Explainability" title="Deep Analysis" />
       <div className="card stack">
-        <textarea className="textarea" value={text} onChange={(e) => setText(e.target.value)} />
+        {ticketId && <div className="caption">Analyzing complaint from <Link to={`/console/tickets/${encodeURIComponent(ticketId)}`}>{ticketId}</Link></div>}
+        <textarea className="textarea" aria-label="Complaint draft" value={text}
+          onChange={(e) => editDraft(e.target.value)} />
         <div className="chips">
           {SAMPLES.map((s) => (
-            <button key={s} className="chip" onClick={() => setText(s)}>
+            <button key={s} className="chip" onClick={() => editDraft(s)}>
               {s.slice(0, 42)}…
             </button>
           ))}
         </div>
         <div className="row">
-          <button className="btn btn-primary" disabled={busy || text.trim().length < 5} onClick={run}>
+          <button className="btn btn-primary" disabled={busy || text.trim().length < 5} onClick={() => void run()}>
             {busy ? <Spinner light /> : "Analyze"}
           </button>
           <span className="caption">
@@ -266,7 +299,7 @@ export function PlaygroundPage() {
                   <div key={i} className="body-sm">
                     {i + 1}. {s.text}{" "}
                     {s.citations.map((c) => (
-                      <Cite key={c} id={c} />
+                      <AdminSourceLink key={c} id={c} />
                     ))}
                   </div>
                 ))
@@ -282,7 +315,7 @@ export function PlaygroundPage() {
                 <div key={i} className="body-sm">
                   {i + 1}. {s.text}{" "}
                   {s.citations.map((c) => (
-                    <Cite key={c} id={c} />
+                    <AdminSourceLink key={c} id={c} />
                   ))}
                 </div>
               ))}
@@ -323,13 +356,14 @@ export function PlaygroundPage() {
             {result.sources.map((s) => (
               <div key={s.id} style={{ borderTop: "1px solid var(--hairline-soft)", paddingTop: 8 }}>
                 <div className="row-between">
-                  <Cite id={s.id} />
+                  <AdminSourceLink id={s.id} />
                   <span className="caption num">
                     sim {s.similarity?.toFixed(3) ?? "—"} · rerank {s.rerank?.toFixed(3) ?? "—"}
                   </span>
                 </div>
                 <div className="body-sm">{s.title}</div>
                 <div className="caption">{s.snippet?.slice(0, 220)}</div>
+                <AdminSourceLink id={s.id}>Open full {s.kind === "kb" ? "knowledge-base article" : "resolved case"}</AdminSourceLink>
               </div>
             ))}
           </div>
