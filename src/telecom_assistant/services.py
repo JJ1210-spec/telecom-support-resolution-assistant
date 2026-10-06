@@ -24,8 +24,6 @@ from .insights.incidents import IncidentRadar
 from .knowledge.indexer import Indexer, kb_chunks
 from .knowledge.retrieval import Retriever
 from .knowledge.taxonomy import TaxonomyRegistry
-from .notify.outbox import OutboxDispatcher
-from .notify.service import NotificationService
 from .telemetry import Langfuse
 
 
@@ -48,8 +46,6 @@ class Services:
     copilot: Copilot
     summarizer: Summarizer
     step_chat: StepChat
-    notifications: NotificationService
-    outbox: OutboxDispatcher
     incidents: IncidentRadar
     discovery: Discovery
     drift: DriftMonitor
@@ -106,14 +102,12 @@ def build_services(settings: Settings, *, db: Database | None = None, llm: LLMGa
                                  "intent": chunk["intent"], "product": chunk["product"], "origin": chunk["origin"]})
         return sections
 
-    notifications = NotificationService(settings, db)
     return Services(
         settings=settings, db=db, kv=kv, langfuse=langfuse, llm=llm, embedder=embedder, reranker=reranker,
         index=index, indexer=indexer, retriever=retriever, registry=registry,
         clarify=ClarifyEngine(settings, registry, retriever), triager=Triager(llm),
         resolver=Resolver(settings, llm, expand_kb), copilot=Copilot(llm), summarizer=Summarizer(llm),
-        step_chat=StepChat(llm), notifications=notifications,
-        outbox=OutboxDispatcher(settings, db, notifications), incidents=IncidentRadar(settings, db),
+        step_chat=StepChat(llm), incidents=IncidentRadar(settings, db),
         discovery=Discovery(db, registry, retriever, llm), drift=DriftMonitor(settings, db),
     )
 

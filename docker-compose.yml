@@ -1,19 +1,7 @@
-# Two thin services. All heavy compute (LLMs, embeddings, vector search) is behind hosted APIs.
-# `api` serves the REST API + React app; `notify` is the email service, reached over HTTP (NOTIFY_URL).
+# FastAPI serves the API and the built React app.
 services:
   api:
     build: .
     env_file: .env
-    environment:
-      DEPLOY_MODE: services
-      NOTIFY_URL: http://notify:8002
-      APP_URL: http://localhost:8000
     ports: ["8000:8000"]
-    depends_on: [notify]
-    restart: unless-stopped
-  notify:
-    build: .
-    env_file: .env
-    command: ["uvicorn", "telecom_assistant.main:notify_app", "--host", "0.0.0.0", "--port", "8002"]
-    expose: ["8002"]
     restart: unless-stopped

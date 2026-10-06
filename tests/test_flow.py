@@ -1,8 +1,9 @@
 """End-to-end: intake -> ticket -> analysis -> step checklist -> escalation -> admin loop -> reopen ->
-confirmation -> KB learning, plus authorization, CSRF and email acknowledgements."""
+confirmation -> KB learning, plus authorization and CSRF."""
 
 from __future__ import annotations
 
+import asyncio
 import time
 
 import pytest
@@ -11,7 +12,7 @@ from fastapi.testclient import TestClient
 
 from telecom_assistant.api.app import create_app
 from telecom_assistant.api.security import Accounts
-from telecom_assistant.db import corpus_tickets, email_log, kb_articles, outbox, tickets, users
+from telecom_assistant.db import corpus_tickets, kb_articles, tickets, users
 
 PASSWORD = "correct-horse-battery"
 
@@ -46,11 +47,6 @@ def wait_analysis(client: TestClient, ticket_id: str, headers: dict | None = Non
     raise AssertionError("analysis did not finish")
 
 
-def drain_outbox(client: TestClient) -> None:
-    for _ in range(5):
-        client.portal.call(client.services.outbox.run_once)
-
-
 def test_full_lifecycle(client, services, fake_llm):
     Accounts(services.db).create("admin@test.dev", PASSWORD, "admin", "Arjun")
     csrf = register(client, "priya@test.dev")
@@ -80,12 +76,6 @@ def test_full_lifecycle(client, services, fake_llm):
     ticket = wait_analysis(client, ticket_id)
     assert ticket["status"] in ("self_service", "escalated")
     assert ticket["issue"]["label"]
-
-    # the acknowledgement email went through the outbox exactly once
-    drain_outbox(client)
-    with services.db.read() as con:
-        templates = [r.template for r in con.execute(sa.select(email_log).where(email_log.c.ticket_id == ticket_id))]
-    assert templates.count("ticket_received") == 1
 
     # every AI customer step is grounded in a self-help section; the fabricated one was dropped
     assert ticket["steps"], "expected grounded customer steps"
@@ -135,19 +125,21 @@ def test_full_lifecycle(client, services, fake_llm):
     ticket = client.post(f"/v1/tickets/{ticket_id}/confirm", headers=csrf, json={"solved": True}).json()
     assert ticket["status"] == "resolved"
 
-    # learning: summary indexed as a new searchable case, KB draft proposed, resolved email sent
-    drain_outbox(client)
+    # learning: summary indexed as a new searchable case and KB draft proposed
+    for _ in range(100):
+        with services.db.read() as con:
+            learned = con.execute(sa.select(corpus_tickets).where(
+                corpus_tickets.c.ticket_id == f"LRN-{ticket_id}")).first()
+        if learned:
+            break
+        time.sleep(0.05)
     with services.db.read() as con:
         learned = con.execute(sa.select(corpus_tickets).where(corpus_tickets.c.ticket_id == f"LRN-{ticket_id}")).first()
         drafts = con.execute(sa.select(kb_articles).where(kb_articles.c.source_ticket_id == ticket_id)).all()
-        templates = [r.template for r in con.execute(sa.select(email_log).where(email_log.c.ticket_id == ticket_id))]
-        pending = con.execute(sa.select(outbox).where(outbox.c.status != "sent")).all()
     assert learned is not None and learned.source == "learned" and learned.indexed_at is not None
 
 
     assert drafts and drafts[0].status == "draft"
-    assert {"ticket_received", "admin_message", "solution_proposed", "reopened", "resolved"} <= set(templates)
-    assert not pending
     hits = client.portal.call(services.retriever.search, "Evening broadband drops fixed by channel change")
     assert any(t["id"] == f"LRN-{ticket_id}" for t in hits.tickets)
 
@@ -160,6 +152,30 @@ def test_full_lifecycle(client, services, fake_llm):
     assert ticket["feedback"]["rating"] == 5
     stats = admin.get("/v1/admin/stats").json()
     assert stats["tickets"] >= 1 and stats["reopen_rate"] > 0
+
+
+def test_unfinished_resolution_is_learned_on_startup(client, services):
+    customer = Accounts(services.db).create("resume@test.dev", PASSWORD, "customer", "Sam")
+    desk = client.app.state.desk
+    with services.db.tx() as con:
+        ticket_id = desk.store.create(con, customer["id"], "Broadband stopped working", "Broadband stopped working",
+                                      "broadband", "Indiranagar", None, "Broadband stopped working")
+        desk.store.transition(con, ticket_id, "self_service", "system", "system")
+        desk.store.transition(con, ticket_id, "resolved", customer["id"], "customer",
+                              {"note": "Working again", "confirmed_by": "customer"})
+        desk.store.event(con, ticket_id, customer["id"], "customer", "resolved", {"confirmed": True})
+
+    async def resume() -> None:
+        desk.resume_learning()
+        await asyncio.gather(*tuple(desk.tasks))
+
+    client.portal.call(resume)
+    with services.db.read() as con:
+        summary = con.execute(sa.select(tickets.c.resolution_summary).where(tickets.c.id == ticket_id)).scalar_one()
+        learned = con.execute(sa.select(corpus_tickets).where(
+            corpus_tickets.c.ticket_id == f"LRN-{ticket_id}")).first()
+    assert summary["learned_record"] == f"LRN-{ticket_id}"
+    assert learned is not None and learned.outcome_score == 0.9
 
 
 def test_admin_required_case_shows_only_safe_precautions(client, services):

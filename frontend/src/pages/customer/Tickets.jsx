@@ -209,7 +209,7 @@ export function TicketDetail() {
       {analyzing && (
         <div className="ws-strip">
           <Spinner /> <span className="pulse">{PROGRESS_TEXT[stage ?? ""] ?? "Analysing your request…"}</span>
-          <span className="caption">Your ticket is saved and you'll get an email.</span>
+          <span className="caption">Your ticket is saved. Updates will appear here.</span>
         </div>
       )}
       {t.incident && (
@@ -385,7 +385,7 @@ function StepsTab({ ticket: t, busy, open, anyWorked, onStatus, onChat, onSolved
       {t.analysis_state === "running" && <p className="muted body-sm">Steps will appear here in a few seconds.</p>}
       {t.analysis_state !== "running" && t.steps.length === 0 && (
         <Empty title="An admin is on it">
-          This issue needs a person to look at it. You'll get a reply in the conversation and by email.
+          This issue needs an admin to look at it. You'll get a reply in this conversation.
         </Empty>
       )}
       {t.steps.length > 0 && (

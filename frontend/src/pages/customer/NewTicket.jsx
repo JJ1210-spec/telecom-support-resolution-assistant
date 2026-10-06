@@ -231,7 +231,7 @@ export default function NewTicket() {
                   ))}
                 </div>
                 <p className="caption">
-                  We'll email you a confirmation right away, and your ticket stays open until you confirm it's solved.
+                  Your ticket will appear in your dashboard and stay open until you confirm it's solved.
                 </p>
               </section>
             )}
@@ -325,7 +325,7 @@ export default function NewTicket() {
             <Icon name="user" size={16} /> Anything complex goes to an admin.
           </div>
           <div className="row nowrap">
-            <Icon name="mail" size={16} /> Email confirmation in seconds.
+            <Icon name="chat" size={16} /> Track updates in your dashboard.
           </div>
         </div>
       </aside>

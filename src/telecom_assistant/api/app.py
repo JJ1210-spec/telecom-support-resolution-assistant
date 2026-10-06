@@ -1,5 +1,5 @@
 """HTTP API (FastAPI): customer portal, admin console, SSE stream, health/metrics, and the
-React single-page app. In monolith mode the notification service is mounted at /notify."""
+React single-page app."""
 
 from __future__ import annotations
 
@@ -20,7 +20,6 @@ from ..db import eval_runs, incidents, traces
 from ..gateways.kv import rate_limited
 from ..insights.stats import overview
 from ..knowledge.details import source_detail
-from ..notify.service import create_notify_app
 from ..services import Services, build_services
 from ..telemetry import configure_logging, log_event, metrics
 from ..tickets.desk import Forbidden, NotFound, SupportDesk
@@ -166,9 +165,10 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
         if services.index.backend == "local":
             rebuilt = await services.indexer.rebuild_from_db()
             log_event("local_index_rebuilt", **rebuilt)
+        desk.resume_learning()
         workers = []
         if start_workers:
-            workers = [asyncio.create_task(services.outbox.run()), asyncio.create_task(services.langfuse.run())]
+            workers = [asyncio.create_task(services.langfuse.run())]
         log_event("startup", **{k: v for k, v in settings.redacted().items() if k != "thresholds"})
         yield
         for task in workers:
@@ -182,8 +182,6 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
     app.state.services, app.state.desk, app.state.accounts, app.state.settings = services, desk, accounts, settings
     app.add_middleware(CORSMiddleware, allow_origins=settings.allowed_origins, allow_credentials=True,
                        allow_methods=["*"], allow_headers=["*"])
-    if settings.deploy_mode == "monolith":
-        app.mount("/notify", create_notify_app(settings, services.db))
 
     @app.exception_handler(NotFound)
     async def _nf(_: Request, exc: NotFound):
@@ -398,10 +396,6 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
     async def copilot(ticket_id: str, user: dict = Depends(admin_write)) -> dict:
         return await desk.refresh_copilot(ticket_id)
 
-    @app.get("/v1/admin/tickets/{ticket_id}/emails", tags=["admin"])
-    async def ticket_emails(ticket_id: str, user: dict = Depends(admin_read)) -> dict:
-        return {"emails": await asyncio.to_thread(services.notifications.list, ticket_id)}
-
     @app.post("/v1/admin/analyze", tags=["admin"])
     async def playground(data: AnalyzeIn, request: Request, user: dict = Depends(admin_write)) -> dict:
         await limit(request, "playground", 30, 600)
@@ -492,18 +486,9 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
                            "kv": {"backend": services.kv.backend, "ok": await services.kv.ping()},
                            "llm": services.llm is not None, "reranker": bool(services.reranker)},
             "providers": await services.llm.quota_report() if services.llm else [],
-            "outbox": await asyncio.to_thread(services.outbox.stats),
             "metrics": metrics.snapshot(), "config": settings.redacted(),
             "index_counts": {"tickets": await services.index.count("tickets"), "kb": await services.index.count("kb")},
         }
-
-    @app.post("/v1/admin/outbox/replay", tags=["admin"])
-    async def replay(user: dict = Depends(admin_write)) -> dict:
-        return {"replayed": await asyncio.to_thread(services.outbox.replay, None)}
-
-    @app.get("/v1/admin/emails", tags=["admin"])
-    async def emails(user: dict = Depends(admin_read)) -> dict:
-        return {"emails": await asyncio.to_thread(services.notifications.list, None, 100)}
 
     @app.get("/v1/admin/evals", tags=["admin"])
     def evals(user: dict = Depends(admin_read)) -> dict:
@@ -527,7 +512,7 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
             target = (dist / path).resolve()
             if path and target.is_file() and dist.resolve() in target.parents:
                 return FileResponse(target)
-            if path.startswith(("v1/", "auth/", "notify/")):
+            if path.startswith(("v1/", "auth/")):
                 raise HTTPException(404, "Not found")
             return FileResponse(dist / "index.html")
 

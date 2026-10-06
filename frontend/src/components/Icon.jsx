@@ -20,7 +20,6 @@ const PATHS = {
   grid: "M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z",
   alert: "M12 3l9 16H3zM12 10v4M12 17h.01",
   play: "M7 5l12 7-12 7z",
-  mail: "M3 6h18v12H3zM3 7l9 6 9-6",
   radar: "M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0-18 0M12 12m-5 0a5 5 0 1 0 10 0a5 5 0 1 0-10 0M12 12l6-6",
   plus: "M12 5v14M5 12h14",
   refresh: "M20 11a8 8 0 0 0-14.8-4M4 4v4h4M4 13a8 8 0 0 0 14.8 4M20 20v-4h-4",

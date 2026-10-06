@@ -2,9 +2,7 @@
 
 Flow for a new ticket
 1. Intake: adaptive clarifying questions (ClarifyEngine) narrow the candidate issues before submission.
-2. The ticket row, its creation event and an acknowledgement email are written in ONE transaction
-   (transactional outbox). The email is held ~20 s so analysis can enrich it with the outcome, but it is
-   sent regardless if analysis crashes.
+2. The ticket row and its creation event are saved before background analysis starts.
 3. Analysis (background): redact -> hybrid retrieval -> k-NN votes -> LLM triage -> grounded draft ->
    citation validation -> routing decision -> incident radar -> discovery pool -> trace.
 4. self_service / assisted: customer gets a checklist of grounded steps with "worked / didn't work" and a
@@ -13,7 +11,7 @@ Flow for a new ticket
    also gets up to two read-only precautions while waiting, never an admin diagnostic action.
 6. Admin replies / asks for info with quick-reply options / proposes a solution; the customer confirms or
    reopens. The ticket stays live until confirmed.
-7. Resolved -> outbox "learn": the whole process is summarized, indexed as a new searchable case, and a KB
+7. Resolved -> background learning: the whole process is summarized, indexed as a new searchable case, and a KB
    article is proposed when the fix is novel. Reopening later down-weights that learned case.
 """
 
@@ -29,9 +27,8 @@ import sqlalchemy as sa
 
 from ..ai.clarify import ClarifyEngine
 from ..ai.resolver import route, select_precaution_steps
-from ..db import corpus_tickets, kb_articles, tickets, traces, users, utc_now, vec_to_bytes
+from ..db import corpus_tickets, kb_articles, ticket_events, tickets, traces, utc_now, vec_to_bytes
 from ..knowledge.retrieval import knn_votes
-from ..notify.outbox import enqueue, refresh_pending
 from ..pii import redact
 from ..services import Services, as_vector
 from ..telemetry import Timer, log_event, metrics
@@ -63,27 +60,34 @@ class SupportDesk:
         self.store = TicketStore(services.db)
         self.bus = bus or EventBus()
         self.tasks: set[asyncio.Task] = set()
-        services.outbox.register("learn", self._learn_handler)
 
     # ------------------------------------------------------------------ utils
     def _spawn(self, coro) -> None:
         task = asyncio.create_task(coro)
         self.tasks.add(task)
-        task.add_done_callback(self.tasks.discard)
+        def done(finished: asyncio.Task) -> None:
+            self.tasks.discard(finished)
+            if not finished.cancelled() and (error := finished.exception()) is not None:
+                log_event("background_task_failed", error=f"{type(error).__name__}: {error}")
+        task.add_done_callback(done)
 
-    def _user(self, user_id: str) -> dict:
+    def resume_learning(self) -> None:
+        """Finish resolutions left without a learned case by an interrupted process."""
         with self.s.db.read() as con:
-            row = con.execute(sa.select(users.c.id, users.c.email, users.c.name).where(users.c.id == user_id)).first()
-        return dict(row._mapping) if row else {"email": "", "name": ""}
-
-    def _email(self, con, ticket: dict, template: str, **context) -> str:
-        owner = self._user(ticket["owner_id"])
-        triage = ticket.get("triage") or {}
-        payload = {"template": template, "to": owner["email"], "ticket_id": ticket["id"], "context": {
-            "name": owner.get("name") or owner["email"].split("@")[0], "url": f"{self.s.settings.app_url}/tickets/"
-            f"{ticket['id']}", "issue": triage.get("intent_label") or ticket.get("subject"),
-            "severity": triage.get("severity") or "-", **context}}
-        return enqueue(con, "email", payload)
+            rows = con.execute(sa.select(tickets.c.id).where(
+                tickets.c.status == "resolved", tickets.c.resolution_summary.is_(None))).all()
+            resolutions = {}
+            for row in rows:
+                history = con.execute(sa.select(ticket_events.c.kind, ticket_events.c.detail).where(
+                    ticket_events.c.ticket_id == row.id,
+                    ticket_events.c.kind.in_(("resolved", "status_changed")))
+                    .order_by(ticket_events.c.id.desc())).all()
+                resolved = next((event.detail or {} for event in history if event.kind == "resolved"), {})
+                transition = next((event.detail or {} for event in history if event.kind == "status_changed"
+                                   and (event.detail or {}).get("to") == "resolved"), {})
+                resolutions[row.id] = (bool(resolved.get("confirmed")), transition.get("note"))
+        for ticket_id, (confirmed, note) in resolutions.items():
+            self._spawn(self.learn(ticket_id, confirmed, note))
 
     async def _own(self, ticket_id: str, user: dict) -> dict:
         ticket = await asyncio.to_thread(self.store.full, ticket_id)
@@ -95,7 +99,6 @@ class SupportDesk:
 
     def _notify(self, ticket: dict, kind: str, **data) -> None:
         self.bus.ticket(ticket["id"], ticket["owner_id"], kind, **data)
-        self.s.outbox.kick()
 
     # ------------------------------------------------------------------ intake
     async def intake_start(self, user: dict, complaint: str, area: str | None, intent: str | None) -> dict:
@@ -129,25 +132,19 @@ class SupportDesk:
         redacted, pii = redact(text)
         subject = complaint.strip().split("\n")[0][:120]
 
-        def _create() -> tuple[str, str]:
+        def _create() -> str:
             with self.s.db.tx() as con:
                 ticket_id = self.store.create(con, user["id"], complaint, redacted, product_hint, region, intake,
                                               subject)
                 if session_id:
                     self.store.link_intake(con, session_id, ticket_id)
-                owner = self._user(user["id"])
-                ack = enqueue(con, "email", {"template": "ticket_received", "to": owner["email"],
-                                             "ticket_id": ticket_id, "context": {
-                                                 "name": owner.get("name"), "status_label": "Received",
-                                                 "url": f"{self.s.settings.app_url}/tickets/{ticket_id}"}},
-                              delay_s=20)
                 if pii:
                     self.store.event(con, ticket_id, "system", "system", "pii_redacted", {"types": pii})
-                return ticket_id, ack
+                return ticket_id
 
-        ticket_id, ack_id = await asyncio.to_thread(_create)
+        ticket_id = await asyncio.to_thread(_create)
         metrics.inc("tickets_created")
-        self._spawn(self.analyze_ticket(ticket_id, ack_id))
+        self._spawn(self.analyze_ticket(ticket_id))
         ticket = await asyncio.to_thread(self.store.full, ticket_id)
         self.bus.ticket(ticket_id, user["id"], "created")
         return self.store.customer_view(ticket)
@@ -244,7 +241,7 @@ class SupportDesk:
                                       "intent": (result.get("triage") or {}).get("intent")},
                               latency_ms=result.get("latency_ms", {}).get("total"), degraded=result.get("degraded"))
 
-    async def analyze_ticket(self, ticket_id: str, ack_id: str | None = None) -> None:
+    async def analyze_ticket(self, ticket_id: str) -> None:
         ticket = await asyncio.to_thread(self.store.raw, ticket_id)
         if not ticket:
             return
@@ -272,9 +269,9 @@ class SupportDesk:
             await asyncio.to_thread(_fail)
             self._notify(ticket, "analyzed")
             return
-        await self._apply_analysis(ticket, result, ack_id)
+        await self._apply_analysis(ticket, result)
 
-    async def _apply_analysis(self, ticket: dict, result: dict, ack_id: str | None) -> None:
+    async def _apply_analysis(self, ticket: dict, result: dict) -> None:
         ticket_id = ticket["id"]
         triage, decision, draft = result["triage"], result["decision"], result["draft"] or {}
         vector = as_vector(result.get("query_vector"))
@@ -317,14 +314,6 @@ class SupportDesk:
                 if customer_steps and route_name != "human" and draft.get("customer_message"):
                     body = f"{body}\n\n{draft['customer_message']}"
                 self.store.add_message(con, ticket_id, "ai", "ai", body)
-                if ack_id:
-                    owner = self._user(ticket["owner_id"])
-                    refresh_pending(con, ack_id, {
-                        "template": "ticket_received", "to": owner["email"], "ticket_id": ticket_id,
-                        "context": {"name": owner.get("name"), "route": route_name, "steps": len(customer_steps),
-                                    "issue": triage.get("intent_label"), "severity": triage["severity"],
-                                    "status_label": "Solution ready" if status == "self_service" else "With support",
-                                    "url": f"{self.s.settings.app_url}/tickets/{ticket_id}"}})
 
         await asyncio.to_thread(_write)
         await self._save_trace(result["trace_id"], ticket_id, "analysis", result)
@@ -362,8 +351,6 @@ class SupportDesk:
                         self.store.add_message(con, mt["id"], "system", "system",
                                                "We've detected an issue affecting several customers in your area. "
                                                "Your ticket is linked to it and we'll update you when it's fixed.")
-                        self._email(con, mt, "incident_linked", incident_id=hit["incident_id"],
-                                    region=ticket.get("region"))
 
                 await asyncio.to_thread(_link)
                 self._notify(member_ticket, "incident_linked", incident_id=hit["incident_id"])
@@ -506,9 +493,9 @@ class SupportDesk:
                     self.store.transition(con, ticket_id, "resolved", user["id"], "customer",
                                           {"note": note, "confirmed_by": "customer"})
                     self.store.event(con, ticket_id, user["id"], "customer", "resolved", {"confirmed": True})
-                    enqueue(con, "learn", {"ticket_id": ticket_id, "confirmed": True})
 
             await asyncio.to_thread(_resolve)
+            self._spawn(self.learn(ticket_id, True))
             metrics.inc("resolutions", by="customer", route=ticket.get("route") or "?")
         else:
             await self._reopen(ticket, user, note)
@@ -529,7 +516,6 @@ class SupportDesk:
                 self.store.event(con, ticket["id"], user["id"], "customer", "reopened", {"note": note})
                 self.store.add_message(con, ticket["id"], user["id"], "customer",
                                        f"The solution didn't work. {note}".strip())
-                self._email(con, ticket, "reopened", status_label="Reopened")
 
         await asyncio.to_thread(_write)
         metrics.inc("reopens")
@@ -592,7 +578,6 @@ class SupportDesk:
                                      {"options": options})
                 elif ticket["status"] == "escalated":
                     self.store.transition(con, ticket_id, "in_progress", admin["id"], admin["role"])
-                self._email(con, ticket, "admin_message", message=body, options=options)
 
         await asyncio.to_thread(_write)
         self._notify(ticket, "message")
@@ -614,7 +599,6 @@ class SupportDesk:
                                       {"steps": len(step_texts)}, assignee_id=ticket.get("assignee_id") or admin["id"])
                 self.store.event(con, ticket_id, admin["id"], admin["role"], "solution_proposed",
                                  {"steps": step_texts})
-                self._email(con, ticket, "solution_proposed", steps=step_texts)
 
         await asyncio.to_thread(_write)
         self._notify(ticket, "solution_proposed")
@@ -631,9 +615,9 @@ class SupportDesk:
                                       {"note": note, "confirmed_by": "admin"})
                 self.store.add_message(con, ticket_id, admin["id"], "admin", note, visibility="internal")
                 self.store.event(con, ticket_id, admin["id"], admin["role"], "resolved", {"confirmed": False})
-                enqueue(con, "learn", {"ticket_id": ticket_id, "confirmed": False, "note": note})
 
         await asyncio.to_thread(_write)
+        self._spawn(self.learn(ticket_id, False, note))
         metrics.inc("resolutions", by="admin", route=ticket.get("route") or "?")
         self._notify(ticket, "status")
         return await self.admin_ticket(ticket_id)
@@ -684,9 +668,6 @@ class SupportDesk:
         return {"incident_id": incident_id, "tickets_updated": len(members)}
 
     # ------------------------------------------------------------------ learning loop
-    async def _learn_handler(self, payload: dict) -> None:
-        await self.learn(payload["ticket_id"], bool(payload.get("confirmed")), payload.get("note"))
-
     async def learn(self, ticket_id: str, confirmed: bool, note: str | None = None) -> dict:
         ticket = await asyncio.to_thread(self.store.full, ticket_id)
         if not ticket:
@@ -734,12 +715,9 @@ class SupportDesk:
                                                                       "closest_kb_similarity": round(best_kb, 3)})
                 self.store.event(con, ticket_id, "system", "system", "learned",
                                  {"record": learned_id, "kb_draft": kb_draft, "index": report.as_dict()})
-                self._email(con, ticket, "resolved", root_cause=summary["root_cause"],
-                            steps=summary["resolution_steps"][:5])
 
         await asyncio.to_thread(_write)
         metrics.inc("learned_cases")
-        self.s.outbox.kick()
         self._notify(ticket, "learned")
         return {"learned_record": learned_id, "kb_draft": kb_draft, "summary": summary}
 

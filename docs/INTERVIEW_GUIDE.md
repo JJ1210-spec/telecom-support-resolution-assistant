@@ -64,7 +64,7 @@ flowchart LR
    "still not working", which reopens the **same** ticket.
 8. **Learning.** Once resolved, an LLM summarises the whole ticket, and the summary is immediately searchable as
    a new past case. If the fix was new, it becomes a KB draft that an admin approves.
-9. **Email.** A separate notification service sends an acknowledgement immediately and an update at every change.
+9. **Updates.** The ticket timeline and live event stream show status changes, messages and incident notices.
 
 ---
 
@@ -109,11 +109,9 @@ A small state machine: analyzing → self_service / escalated → in_progress �
 solution_proposed → resolved. Illegal moves are rejected. Every change writes an event, which forms both the
 audit trail and the customer's timeline.
 
-**Email as a service, `notify/`.**
-The email service is a separate FastAPI app. When a ticket changes, the email request is written to an
-"outbox" table *in the same database transaction*, so an email can't be lost and can't be sent for a change
-that failed. A background worker delivers it, retries with backoff, and moves it to a dead-letter queue after
-6 failures. Sends are idempotent: the same event never sends twice.
+**Live updates, `tickets/events.py`.**
+Ticket changes are stored in the timeline. The event bus pushes updates to connected dashboards so customers
+and admins can follow the same ticket. Incident Radar adds a message to every linked ticket.
 
 **Copilot, `ai/assistants.py`.**
 For escalated tickets, the LLM reads the timeline, the steps the customer tried and failed, and similar
@@ -152,7 +150,7 @@ If every model is down, the ticket is still saved and goes to a human; nothing i
 | Customer steps must cite self-help sections | The model can't reliably tell safe actions from admin-only ones; the KB can | Letting the LLM decide what's safe |
 | Intake by information gain, no LLM | Deterministic, testable, explainable, free | LLM chat interview: slow, costly, unpredictable |
 | Postgres is the source of truth; vectors are derived | A lost vector index can be rebuilt from the database with cached embeddings | Treating the vector DB as the only copy |
-| Transactional outbox for email | No lost or phantom emails | Sending email inside the request |
+| Ticket timeline and event stream | Status and messages stay visible in the product | Requiring a page refresh for every update |
 | Learned summaries auto-indexed, KB articles need approval | Fast learning, without unreviewed text becoming official advice | Auto-publishing everything |
 | Live taxonomy in the database | New issue types without code changes or retraining | Hard-coded labels |
 
@@ -210,8 +208,8 @@ From the earlier `reports/eval_20261003_195637.md`: 56 held-out English test com
   (≈10 GB for 10M tickets).
 - **LLMs:** switch free tiers to paid tiers (config only). Cache prompts, and route easy tickets to cheaper
   models.
-- **Queue:** QStash today; Kafka beyond ~1,000 events per second. The indexer is already idempotent
-  (versioned, content-hashed).
+- **Learning:** background after resolution; the indexer is idempotent (versioned, content-hashed) and
+  unfinished summaries resume at startup.
 - **Live updates:** today they run in-process; in production they move to Redis pub/sub so every server can
   push them.
 - **Changing the embedding model:** build new collections, then atomically switch an alias (blue/green, zero
@@ -277,7 +275,7 @@ text stays only in the ticket database, visible to the customer and admins.
 **Q: How do you test something that uses an LLM?**
 Two levels:
 
-- **Tests:** a fake, deterministic LLM, a hash-based embedder and SQLite, so the 27 tests run offline in CI at
+- **Tests:** a fake, deterministic LLM, a hash-based embedder and SQLite, so the tests run offline in CI at
   zero cost.
 - **Evaluation:** a separate harness runs the real models on 74 held-out cases and reports accuracy, safety,
   retrieval quality and latency.
@@ -288,7 +286,6 @@ Two levels:
 - Better severity accuracy on the P2/P3 boundary.
 - An NER-based PII detector.
 - Redis pub/sub for multi-server live updates.
-- Real email delivery (SMTP or Resend).
 
 ---
 
@@ -303,7 +300,6 @@ Two levels:
 | Entropy / bits | How uncertain we are; each good question removes some bits |
 | RAG | Retrieval-augmented generation: the LLM answers from retrieved documents |
 | Abstain | The AI deliberately gives no answer when evidence is weak |
-| Outbox pattern | Save "send this email" in the same DB transaction as the change; deliver later |
 | Circuit breaker | Stop calling a failing service for a while instead of hammering it |
 | PSI | Population Stability Index: measures distribution shift |
 | OOD | Out of distribution: unlike anything in the training or indexed data |
@@ -319,7 +315,7 @@ Two levels:
 | Classification + severity rules | `src/telecom_assistant/ai/triage.py` |
 | Grounding + routing | `src/telecom_assistant/ai/resolver.py` |
 | Search | `src/telecom_assistant/knowledge/retrieval.py` |
-| Email service + outbox | `src/telecom_assistant/notify/` |
+| Live ticket updates | `src/telecom_assistant/tickets/events.py` |
 | Drift / discovery / incidents | `src/telecom_assistant/insights/` |
 | LLM failover + rate limits | `src/telecom_assistant/gateways/llm.py` |
 | HTTP API | `src/telecom_assistant/api/app.py` |

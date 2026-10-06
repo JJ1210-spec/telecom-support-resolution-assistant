@@ -1,7 +1,7 @@
 """Relational schema (SQLAlchemy Core). Neon Postgres in hosted mode, SQLite for tests/offline.
 
 The relational store is the system of record: tickets, conversations, step outcomes, taxonomy
-versions, KB versions, traces and the notification outbox. Vector indexes are derived data and can
+versions, KB versions and traces. Vector indexes are derived data and can
 be rebuilt from here (embeddings are cached by content hash, so a rebuild costs no API tokens).
 """
 
@@ -265,34 +265,6 @@ embedding_cache = sa.Table(
     sa.Column("vector", sa.LargeBinary, nullable=False),
 )
 
-outbox = sa.Table(
-    "outbox", metadata,
-    sa.Column("id", sa.String(40), primary_key=True),
-    sa.Column("topic", sa.String(60), nullable=False),
-    sa.Column("payload", sa.JSON, nullable=False),
-    sa.Column("status", sa.String(16), nullable=False, index=True),  # pending | sent | dead
-    sa.Column("attempts", sa.Integer, nullable=False, server_default="0"),
-    sa.Column("next_attempt_at", TS, nullable=False),
-    sa.Column("last_error", sa.Text, nullable=True),
-    sa.Column("created_at", TS, nullable=False),
-    sa.Column("sent_at", TS, nullable=True),
-)
-
-email_log = sa.Table(
-    "email_log", metadata,
-    sa.Column("event_id", sa.String(80), primary_key=True),  # idempotency key
-    sa.Column("ticket_id", sa.String(32), nullable=True, index=True),
-    sa.Column("to_address", sa.String(254), nullable=False),
-    sa.Column("template", sa.String(60), nullable=False),
-    sa.Column("subject", sa.String(300), nullable=False),
-    sa.Column("html", sa.Text, nullable=False),
-    sa.Column("text", sa.Text, nullable=False),
-    sa.Column("transport", sa.String(16), nullable=False),
-    sa.Column("status", sa.String(16), nullable=False),
-    sa.Column("error", sa.Text, nullable=True),
-    sa.Column("created_at", TS, nullable=False),
-)
-
 incidents = sa.Table(
     "incidents", metadata,
     sa.Column("id", sa.String(32), primary_key=True),
@@ -357,6 +329,10 @@ class Database:
 
     def create_all(self) -> None:
         metadata.create_all(self.engine)
+        # Remove tables from installations that used the retired delivery subsystem.
+        with self.engine.begin() as con:
+            con.execute(sa.text("DROP TABLE IF EXISTS outbox"))
+            con.execute(sa.text("DROP TABLE IF EXISTS email_log"))
 
     @contextmanager
     def tx(self) -> Iterator[Connection]:

@@ -98,8 +98,7 @@ def test_settings(tmp_path: Path, **overrides) -> Settings:
     values = dict(database_url=f"sqlite:///{(tmp_path / 'app.sqlite3').as_posix()}", vector_backend="local",
                   embed_provider="hash", llm_chain_triage=chain, llm_chain_draft=chain, llm_chain_assist=chain,
                   llm_chain_judge=chain, runtime_dir=tmp_path / "runtime", frontend_dist=tmp_path / "nodist",
-                  service_token="test-service-token-0123456789-abcdefghijkl", allowed_origins=[],
-                  app_url="http://test")
+                  allowed_origins=[])
     values.update(overrides)
     return Settings(**values)
 

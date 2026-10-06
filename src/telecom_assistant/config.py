@@ -7,7 +7,6 @@ tier (or a hosted service for its local fallback) never needs a code change.
 from __future__ import annotations
 
 import os
-import secrets
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -60,27 +59,12 @@ class Settings:
     # Upstash
     upstash_redis_url: str = ""
     upstash_redis_token: str = ""
-    qstash_token: str = ""
-    qstash_current_signing_key: str = ""
-    qstash_next_signing_key: str = ""
-    public_base_url: str = ""
-    app_url: str = "http://localhost:5173"
 
     # Observability
     langfuse_public_key: str = ""
     langfuse_secret_key: str = ""
     langfuse_host: str = "https://cloud.langfuse.com"
 
-    # Notifications
-    email_transport: str = "outbox"  # outbox | smtp | resend
-    email_from: str = "Support Desk <support@example.com>"
-    smtp_host: str = ""
-    smtp_port: int = 587
-    smtp_user: str = ""
-    smtp_password: str = ""
-    resend_api_key: str = ""
-    notify_url: str = ""  # empty = in-process notification service
-    deploy_mode: str = "monolith"
 
     # Quotas (requests per day per provider:model; pre-emptive failover at 90%)
     quota_rpd_gemini: int = 1000
@@ -106,7 +90,6 @@ class Settings:
 
     # Runtime
     runtime_dir: Path = Path(".runtime")
-    service_token: str = ""
     allowed_origins: list[str] = field(default_factory=list)
     frontend_dist: Path = ROOT / "frontend" / "dist"
     cache_ttl_s: int = 3600
@@ -143,23 +126,9 @@ class Settings:
             llm_timeout_s=_float("LLM_TIMEOUT_S", cls.llm_timeout_s),
             upstash_redis_url=_env("UPSTASH_REDIS_REST_URL"),
             upstash_redis_token=_env("UPSTASH_REDIS_REST_TOKEN"),
-            qstash_token=_env("QSTASH_TOKEN"),
-            qstash_current_signing_key=_env("QSTASH_CURRENT_SIGNING_KEY"),
-            qstash_next_signing_key=_env("QSTASH_NEXT_SIGNING_KEY"),
-            public_base_url=_env("PUBLIC_BASE_URL").rstrip("/"),
-            app_url=_env("APP_URL", _env("PUBLIC_BASE_URL") or cls.app_url).rstrip("/"),
             langfuse_public_key=_env("LANGFUSE_PUBLIC_KEY"),
             langfuse_secret_key=_env("LANGFUSE_SECRET_KEY"),
             langfuse_host=_env("LANGFUSE_HOST", cls.langfuse_host).rstrip("/"),
-            email_transport=_env("EMAIL_TRANSPORT", cls.email_transport),
-            email_from=_env("EMAIL_FROM", cls.email_from),
-            smtp_host=_env("SMTP_HOST"),
-            smtp_port=_int("SMTP_PORT", cls.smtp_port),
-            smtp_user=_env("SMTP_USER"),
-            smtp_password=_env("SMTP_PASSWORD"),
-            resend_api_key=_env("RESEND_API_KEY"),
-            notify_url=_env("NOTIFY_URL").rstrip("/"),
-            deploy_mode=_env("DEPLOY_MODE", cls.deploy_mode),
             quota_rpd_gemini=_int("QUOTA_RPD_GEMINI", cls.quota_rpd_gemini),
             quota_rpd_groq=_int("QUOTA_RPD_GROQ", cls.quota_rpd_groq),
             quota_failover_ratio=_float("QUOTA_FAILOVER_RATIO", cls.quota_failover_ratio),
@@ -176,25 +145,11 @@ class Settings:
             clarify_max_questions=_int("CLARIFY_MAX_QUESTIONS", cls.clarify_max_questions),
             ood_similarity=_float("OOD_SIMILARITY", cls.ood_similarity),
             runtime_dir=Path(_env("RUNTIME_DIR", ".runtime")),
-            service_token=_env("SERVICE_TOKEN"),
             allowed_origins=_chain("ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"),
             cache_ttl_s=_int("CACHE_TTL_S", cls.cache_ttl_s),
         )
         values.update(overrides)
         return cls(**values)
-
-    def internal_token(self) -> str:
-        """Shared secret for service-to-service calls (notification service, QStash-less pushes)."""
-        if self.service_token:
-            return self.service_token
-        path = self.runtime_dir / "service-token"
-        path.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            with path.open("x", encoding="utf-8") as stream:
-                stream.write(secrets.token_urlsafe(48))
-        except FileExistsError:
-            pass
-        return path.read_text(encoding="utf-8").strip()
 
     @property
     def sqlalchemy_url(self) -> str:
@@ -221,10 +176,7 @@ class Settings:
                 "assist": self.llm_chain_assist, "judge": self.llm_chain_judge,
             },
             "cache": "upstash" if self.upstash_redis_url else "memory",
-            "queue": "qstash" if self.qstash_token and self.public_base_url else "in-process",
-            "email_transport": self.email_transport,
             "langfuse": bool(self.langfuse_public_key),
-            "deploy_mode": self.deploy_mode,
             "thresholds": {
                 "min_retrieval_score": self.min_retrieval_score,
                 "strong_match_score": self.strong_match_score,

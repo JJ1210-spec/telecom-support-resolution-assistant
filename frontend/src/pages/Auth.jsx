@@ -84,7 +84,7 @@ export function Register() {
   return (
     <AuthShell
       title="Get help in minutes"
-      sub="Create an account so your ticket stays live and you get updates by email."
+      sub="Create an account to track your ticket and updates in your dashboard."
     >
       <form className="stack" onSubmit={submit}>
         <label className="field">

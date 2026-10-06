@@ -24,11 +24,6 @@ flowchart LR
     RES["Resolver<br/>grounded draft · citation gate · routing"]
     AST["Copilot · Summarizer · StepChat"]
     INS["Insights<br/>incident radar · drift · discovery"]
-    OUT["Transactional outbox<br/>+ dispatcher (retry, DLQ)"]
-  end
-
-  subgraph Notify["Notification service (separate FastAPI app)"]
-    NS["render templates · idempotent send<br/>outbox | SMTP | Resend"]
   end
 
   subgraph Gateways["Gateways (in-process libraries)"]
@@ -43,27 +38,23 @@ flowchart LR
     QD[("Qdrant Cloud<br/>tickets / kb · dense + BM25")]
     PG[("Neon Postgres<br/>system of record")]
     RD[("Upstash Redis<br/>cache · quotas · rate limits")]
-    QS["Upstash QStash<br/>signed push, retries"]
     LF["Langfuse<br/>LLM traces"]
   end
 
   C & A --> API --> DESK
-  DESK --> CLR & TRI & RES & AST & INS & OUT
+  DESK --> CLR & TRI & RES & AST & INS
   CLR & TRI & RES & AST --> LLMG & EMB
   LLMG --> GEM & GROQ
   EMB --> JINA
   RES --> QD
   DESK --> PG
   LLMG --> RD
-  OUT -- "PUBLIC_BASE_URL set" --> QS --> NS
-  OUT -- "NOTIFY_URL / in-process" --> NS
   LLMG -.-> LF
 ```
 
-**Boundaries.** Online work runs on request: intake, analysis, conversation. Side effects run asynchronously:
-emails, knowledge learning, discovery and drift. The notification service deploys on its own (`docker-compose.yml`
-runs it as a second container) and is mounted in-process in `DEPLOY_MODE=monolith` to fit free hosting. The
-gateways are libraries, not services, to avoid extra network hops. Their state (quota counters, cache) lives in
+**Boundaries.** Online work runs on request: intake, analysis, conversation. Knowledge learning runs in a
+background task after resolution, and unfinished learning is resumed at startup. The gateways are libraries,
+not services, to avoid extra network hops. Their state (quota counters, cache) lives in
 Upstash, so every replica sees the same values.
 
 **Graceful degradation.**
@@ -75,7 +66,6 @@ Upstash, so every replica sees the same values.
 | Jina embeddings | Sparse BM25-only retrieval |
 | Reranker | Results stay in RRF order |
 | Upstash | In-memory cache and quotas |
-| Email delivery | Exponential backoff, then a dead-letter queue (DLQ) with replay |
 
 Every degradation is recorded in the trace and shown to admins.
 
@@ -83,7 +73,7 @@ Every degradation is recorded in the trace and shown to admins.
 
 ```mermaid
 stateDiagram-v2
-  [*] --> analyzing: customer submits (ack email queued in same DB tx)
+  [*] --> analyzing: customer submits (ticket and event saved)
   analyzing --> self_service: route = self_service
   analyzing --> escalated: route = assisted | human | analysis failure
   self_service --> resolved: customer confirms
@@ -96,7 +86,7 @@ stateDiagram-v2
   solution_proposed --> in_progress: "still not working" (reopen_count++)
   in_progress --> resolved: admin resolves with written note
   resolved --> in_progress: problem came back (reopen, learned case down-weighted)
-  resolved --> learned: outbox "learn" -> summary indexed + KB draft
+  resolved --> learned: background summary indexed + KB draft
 ```
 
 Transitions are enforced in `tickets/lifecycle.py`; an illegal transition returns HTTP 409. Every change
@@ -119,14 +109,14 @@ sequenceDiagram
   CL-->>UI: question with max expected information gain
   UI->>API: answers… (2–3 taps typical)
   UI->>API: POST /v1/tickets {session_id}
-  API->>DB: ticket + event + outbox(ack email, held 20s)  [one transaction]
+  API->>DB: ticket + event [one transaction]
   API-->>UI: 201 (ticket saved)  — analysis continues in background, progress via SSE
   API->>R: hybrid search(redacted complaint + intake answers)
   R-->>API: tickets + KB sections (dense, BM25, RRF, outcome boost, rerank)
   API->>T: classify with live taxonomy + kNN votes + intake answers
   API->>D: draft from KB article(s) of the triaged intent + top past cases
   API->>API: citation validation · customer-safety gate · routing policy
-  API->>DB: triage, sources, decision, steps, trace; release ack email with outcome
+  API->>DB: triage, sources, decision, steps, trace
   API-->>UI: SSE "analyzed"
 ```
 
@@ -222,7 +212,7 @@ reasons, which protects P1 recall.
 
 ```mermaid
 flowchart LR
-  R["Customer confirms fix<br/>(or admin resolves with note)"] --> O["outbox: learn"]
+  R["Customer confirms fix<br/>(or admin resolves with note)"] --> O["Background learning task"]
   O --> S["Summarizer LLM: problem, what failed,<br/>what worked, root cause, self-help"]
   S --> I["Index as searchable case LRN-&lt;ticket&gt;<br/>(outcome 0.9 if customer-confirmed)"]
   S --> N{"Covered by existing KB?<br/>(closest KB similarity ≥ 0.80)"}
@@ -272,11 +262,8 @@ An embedding-model change is a blue/green rebuild into new Qdrant collections, f
   - if every model is unavailable, triage takes the severity of the most similar resolved cases (kNN vote), and
     the deterministic P1 rules still apply;
   - immediate failover when a content filter stops generation (for example Gemini `RECITATION`).
-- **Exactly-once side effects:**
-  - transactional outbox in the same database transaction as the ticket change;
-  - notification idempotency keyed on `event_id`;
-  - QStash deduplication IDs;
-  - signature verification for QStash pushes (HS256 JWT, current and next keys, body hash).
+- **Learning recovery:** Resolved tickets without a summary are picked up again at startup. The learned-case
+  index uses a stable ticket ID and version so repeated indexing does not create duplicate cases.
 - **Auth:** salted scrypt passwords, HttpOnly session cookie, CSRF header on every mutation, role checks on
   the server, account lockout, per-IP rate limits. Public registration can only create customers.
 
@@ -286,7 +273,7 @@ An embedding-model change is a blue/green rebuild into new Qdrant collections, f
 | Traffic | < 1 RPS | Stateless API behind a load balancer with HPA; SSE fan-out moves from the in-process bus to Redis pub/sub |
 | LLM | Gemini/Groq free RPD (≈1k/day each) | Paid Gemini or Claude (`anthropic:` adapter exists); prompt caching for the static system prompt and taxonomy; severity-aware model routing |
 | Vectors | 264 resolved seed tickets / sectioned KB | 5–10M tickets: Qdrant sharding, replication factor 2, int8 quantisation (≈10 GB), payload indexes on filter fields (already created) |
-| Ingestion | Synchronous upsert + outbox | QStash push today; Kafka/Redpanda beyond ~1k events/s; same idempotent indexer |
+| Ingestion | Synchronous upsert; background learning after resolution | Add a durable job runner if resolution volume grows; keep the idempotent indexer |
 | DB | Neon free | Partition `traces` and `ticket_events` by month; retention 90 days; read replicas for the console |
 | Cost control | Quota meters + caches | Response cache keyed on redacted text + taxonomy version; embedding hash cache; batch summarisation |
 
@@ -302,8 +289,8 @@ An embedding-model change is a blue/green rebuild into new Qdrant collections, f
    (provisioning, line tests) from customer-safe ones. The KB says which is which, and code enforces it.
 4. **Postgres as the system of record, Qdrant as derived data.** Every vector can be rebuilt from the database
    plus the embedding cache, so a lost free cluster is a restore job rather than data loss.
-5. **Transactional outbox instead of sending emails inline.** Emails are never lost if the provider is down,
-   and are never sent for a change that rolled back.
+5. **In-app ticket updates.** The event stream and stored timeline let customers and admins follow progress in
+   the product; Incident Radar links related tickets and posts a visible message to each affected ticket.
 6. **Learned cases are auto-indexed; canonical KB needs approval.** Fast feedback without letting unreviewed
    text reach customers as official guidance.
 7. **Solution drift as a first-class signal.** Input-distribution drift alone misses the most damaging failure
@@ -319,5 +306,4 @@ An embedding-model change is a blue/green rebuild into new Qdrant collections, f
 - The dataset is synthetic and templated, so eval numbers are a development baseline, not production accuracy.
 - PII redaction is regex-based. Production would add an NER-based recognizer (for example Presidio).
 - The SSE bus is per-process. Multi-instance deployments need Redis pub/sub; the UI also polls as a fallback.
-- Without SMTP or Resend credentials, emails are captured in the outbox and previewed in the admin UI rather
-  than delivered.
+- Background learning runs within the API process; an interrupted run resumes when the application starts again.

@@ -86,7 +86,6 @@ async def seed(settings: Settings, demo: bool, demo_tickets: int) -> None:
         print("created", ticket["id"], "-", row["subject"])
     while desk.tasks:
         await asyncio.gather(*list(desk.tasks), return_exceptions=True)
-    await services.outbox.run_once()
 
 
 async def updates(settings: Settings) -> None:

@@ -490,10 +490,7 @@ export function DriftPage() {
 export function HealthPage() {
   const health = useResource(() => api.get("/v1/admin/health"), [], 15000);
   const evals = useResource(() => api.get("/v1/admin/evals"), []);
-  const emails = useResource(() => api.get("/v1/admin/emails"), []);
   const [tab, setTab] = useState("system");
-  const [preview, setPreview] = useState(null);
-  const [toast, showToast] = useToast();
   const h = health.data;
   const latency = h
     ? Object.entries(h.metrics.latency_ms)
@@ -505,9 +502,9 @@ export function HealthPage() {
     <div className="stack-lg">
       <ConsoleHead eyebrow="Reliability" title="System health" />
       <div className="tabs">
-        {["system", "evals", "emails"].map((t) => (
+        {["system", "evals"].map((t) => (
           <button key={t} className={`tab${tab === t ? " active" : ""}`} onClick={() => setTab(t)}>
-            {{ system: "Services & quotas", evals: "Evaluation", emails: "Email outbox" }[t]}
+            {{ system: "Services & quotas", evals: "Evaluation" }[t]}
           </button>
         ))}
       </div>
@@ -516,7 +513,7 @@ export function HealthPage() {
           <Spinner />
         ) : (
           <>
-            <div className="grid-4">
+            <div className="grid-3">
               <Stat
                 label="Database"
                 value={h.components.database ? "Up" : "Down"}
@@ -534,12 +531,6 @@ export function HealthPage() {
                 value={h.components.kv.ok ? "Up" : "Down"}
                 tone={h.components.kv.ok ? "up" : "down"}
                 sub={h.components.kv.backend}
-              />
-              <Stat
-                label="Notification channel"
-                value={h.outbox.channel}
-                sub={`${h.outbox.dead_letters.length} dead letters`}
-                tone={h.outbox.dead_letters.length ? "down" : undefined}
               />
             </div>
             <div className="grid-2" style={{ alignItems: "start" }}>
@@ -608,34 +599,6 @@ export function HealthPage() {
                 )}
               </div>
             </div>
-            <div className="card stack">
-              <div className="row-between">
-                <h2 className="title-md">Outbox & dead-letter queue</h2>
-                <button
-                  className="btn btn-secondary btn-sm"
-                  disabled={!h.outbox.dead_letters.length}
-                  onClick={async () => {
-                    const r = await api.post("/v1/admin/outbox/replay");
-                    showToast(`Replayed ${r.replayed}`);
-                    void health.reload();
-                  }}
-                >
-                  Replay dead letters
-                </button>
-              </div>
-              <div className="row">
-                {h.outbox.counts.map((c) => (
-                  <span key={c.topic + c.status} className="badge">
-                    {c.topic} · {c.status} · <span className="num">{c.count}</span>
-                  </span>
-                ))}
-              </div>
-              {h.outbox.dead_letters.map((d) => (
-                <div key={d.id} className="caption mono">
-                  {d.id} {d.topic} ×{d.attempts}: {d.last_error}
-                </div>
-              ))}
-            </div>
             <details className="card-sm">
               <summary className="title-sm" style={{ cursor: "pointer" }}>
                 Active configuration (no secrets)
@@ -655,57 +618,6 @@ export function HealthPage() {
         ) : (
           <EvalView run={run} />
         ))}
-      {tab === "emails" && (
-        <div className="grid-2" style={{ alignItems: "start" }}>
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Template</th>
-                  <th>To</th>
-                  <th>Status</th>
-                  <th>When</th>
-                </tr>
-              </thead>
-              <tbody>
-                {emails.data?.emails.map((e) => (
-                  <tr key={e.event_id} className="clickable" onClick={() => setPreview(e)}>
-                    <td>
-                      <div style={{ fontWeight: 500 }}>{e.template.endsWith("_message") ? "Support reply" : e.template.replace(/_/g, " ")}</div>
-                      <div className="mono caption">{e.ticket_id}</div>
-                    </td>
-                    <td className="caption">{e.to_address}</td>
-                    <td>
-                      <span className={`badge ${e.status === "failed" ? "badge-red" : "badge-green"}`}>
-                        {e.status} · {e.transport}
-                      </span>
-                    </td>
-                    <td className="caption">{ago(e.created_at)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="card-sm">
-            {preview ? (
-              <>
-                <div className="title-sm" style={{ marginBottom: 10 }}>
-                  {preview.subject}
-                </div>
-                <iframe
-                  title="Email preview"
-                  srcDoc={preview.html}
-                  sandbox=""
-                  style={{ width: "100%", height: 560, border: "1px solid var(--hairline)", borderRadius: 12 }}
-                />
-              </>
-            ) : (
-              <div className="caption">Select an email to preview the rendered message.</div>
-            )}
-          </div>
-        </div>
-      )}
-      <Toast message={toast} />
     </div>
   );
 }

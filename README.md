@@ -7,7 +7,7 @@ confirmed resolution to the knowledge base.
 
 - Backend: Python, FastAPI.
 - Frontend: React (JavaScript/JSX) with Vite, styled to the Coinbase-derived design system in `DESIGN-coinbase.md`.
-- Hosted services, all on free tiers: Gemini, Groq, Jina, Qdrant Cloud, Neon Postgres, Upstash Redis + QStash,
+- Hosted services, all on free tiers: Gemini, Groq, Jina, Qdrant Cloud, Neon Postgres, Upstash Redis,
   Langfuse.
 - The same code also runs fully offline.
 
@@ -25,7 +25,7 @@ confirmed resolution to the knowledge base.
 | **Steps** | Fix steps have **Tried - worked / Tried - didn't work** and a **side chat for each step**. All self-service steps failing escalates automatically. Admin-owned tickets may show read-only, cited precautions without fix feedback. | Sees each fix step's outcome, notes and step chat. Outcomes re-weight retrieval and feed solution-drift alerts. |
 | **Conversation** | Thread with **quick-reply choices** when support asks a question | Ask for info with options, reply, add internal notes, propose a fix, resolve with a note |
 | **Lifecycle** | Ticket stays live; "still not working" **reopens the same ticket**; rate the support | Queue sorted by severity and SLA; claim; **copilot** shows similar incidents, root causes, next actions (excluding what failed), questions and a reply draft. Citation links open full admin-only ticket or KB records. **Deep Analysis** opens from Copilot with that complaint filled in and runs a fresh analysis. |
-| **Email** | Acknowledgement in seconds, then updates at every step | Notification microservice: transactional outbox, QStash, idempotent sends, DLQ replay, rendered email preview |
+| **Updates** | Ticket status, messages and incident notices appear in the dashboard | Stored ticket timeline and live event stream |
 | **Learning** | Resolution summary on the ticket | The whole process is summarised and indexed as a searchable case immediately; novel fixes become KB drafts for review |
 | **Drift** | n/a | PSI, out-of-distribution rate, centroid shift, unclassified rate, **solution drift** (fixes that stopped working), new-class discovery → taxonomy vN+1 |
 | **Novelty** | Outage-aware: "known issue in your area" | **Incident radar** groups similar tickets from one area into an incident; resolve once for everyone |
@@ -51,10 +51,10 @@ Open `http://localhost:8000`. The demo accounts are `customer@resolvedesk.dev` a
 password is `DEMO_PASSWORD` in `.env`, or whatever `seed --demo` prints. API docs are at `/docs`.
 
 For UI development, run `npm run dev` in `frontend/` (port 5173, proxied to the API on 8000). Use
-`docker compose up --build` to run the API and the notification service as separate containers.
+`docker compose up --build` to run the API and React app in one container.
 
 **No keys?** Leave `.env` empty and the system runs offline: SQLite, an in-memory vector index, a deterministic
-hash embedder, memory cache, and emails captured in the outbox. AI features need at least one LLM key (Gemini
+hash embedder and memory cache. AI features need at least one LLM key (Gemini
 or Groq). Without one, tickets still save and go to a human.
 
 ## Requirements → where they live
@@ -62,7 +62,7 @@ or Groq). Without one, tickets still save and go to a human.
 | Requirement | Code |
 |---|---|
 | Classify; AI resolves simple/recurring, humans the rest | `ai/resolver.py::route`, `ai/triage.py` |
-| Email acknowledgement **as a service** | `notify/service.py` (FastAPI app), `notify/outbox.py`, `notify/templates.py` |
+| Ticket and incident updates | `tickets/desk.py`, `tickets/events.py`, customer and admin dashboards |
 | Update the same ticket; live until solved | `tickets/lifecycle.py`, `tickets/desk.py` (`customer_confirm`, `_reopen`, `propose_solution`) |
 | Resolved → summary into knowledge base | `tickets/desk.py::learn`, `ai/assistants.py::Summarizer`, `knowledge/indexer.py` |
 | AI suggestions for escalated tickets | `ai/assistants.py::Copilot`, `tickets/desk.py::refresh_copilot` |
@@ -111,8 +111,7 @@ At runtime:
 - `/metrics` exposes Prometheus metrics;
 - `/ready` checks the database, vector store and cache;
 - LLM generations are traced to Langfuse;
-- the admin **Health** page shows provider quota meters, circuit breakers, latency, the outbox/DLQ and the email
-  previews.
+- the admin **Health** page shows provider quota meters, circuit breakers, latency and evaluation runs.
 
 ## Tests
 
@@ -134,7 +133,6 @@ src/telecom_assistant/
   ai/             clarify (information gain), triage, resolver (grounding + routing), copilot/summarizer/step chat, prompts
   knowledge/      indexer (versioned, idempotent), hybrid retriever, taxonomy registry
   gateways/       LLM chain (breaker, quota), Jina embed/rerank (hash cache), Qdrant/local index, Upstash KV
-  notify/         notification service, transactional outbox + dispatcher, email templates
   insights/       drift, discovery, incident radar, KPIs
   resources/      taxonomy seed, question bank, customer self-help KB sections
   evaluation.py   eval harness + markdown report

@@ -14,4 +14,4 @@ Focused tests exercise unresolved exclusion, transition into evidence, stale-ver
 
 ## Limits
 
-Cosine search is a Python scan of the eligible rows in SQLite. It supports the small demo corpus but has no index-based vector scale. Ingestion has no retry queue or dead-letter handling. The API has no authentication. These are later hardening tasks.
+Cosine search is a Python scan of the eligible rows in SQLite. It supports the small demo corpus but has no index-based vector scale. The API has no authentication at this phase. These are later hardening tasks.

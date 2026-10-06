@@ -1,7 +1,7 @@
 # Deploying Resolve Desk online (free)
 
-The app is a **single Docker container**: the FastAPI backend, the built React website and the email service
-(mounted at `/notify`). The databases are already hosted (Neon Postgres, Qdrant Cloud, Upstash), so deploying
+The app is a **single Docker container**: the FastAPI backend and the built React website.
+The databases are already hosted (Neon Postgres, Qdrant Cloud, Upstash), so deploying
 only means running that one container somewhere public.
 
 **Recommended host: [Render](https://render.com)**. The free plan needs no credit card and builds straight from
@@ -41,15 +41,10 @@ GitHub using the `Dockerfile` and `render.yaml` in this repo.
    | `UPSTASH_REDIS_REST_TOKEN` | `.env` |
    | `LANGFUSE_PUBLIC_KEY` | `.env` (optional) |
    | `LANGFUSE_SECRET_KEY` | `.env` (optional) |
-   | `APP_URL` | For now enter `https://resolve-desk.onrender.com`. Fix it in step 7 if your URL differs. |
-
-   `SERVICE_TOKEN` is generated automatically.
 5. Click **Apply**. Render builds the Docker image, which takes about 5–8 minutes the first time. Watch the
    **Logs** tab until you see `Application startup complete`.
 6. Open the URL Render shows at the top of the service, e.g. `https://resolve-desk.onrender.com`.
-7. If your URL differs from what you typed for `APP_URL`, go to **Environment**, update `APP_URL` to the real URL
-   and click **Save changes** (Render redeploys automatically). This only affects links inside emails.
-8. **Check it works:**
+7. **Check it works:**
    - `https://<your-url>/health` shows `{"status":"ok"}`;
    - `https://<your-url>/ready` shows `"database":true,"vector_store":true,"kv":true`;
    - the home page loads, and you can sign in with `customer@resolvedesk.dev` or `admin@resolvedesk.dev`
@@ -74,9 +69,8 @@ GitHub using the `Dockerfile` and `render.yaml` in this repo.
 1. Render → **New +** → **Web Service** → pick the repo and branch.
 2. **Runtime:** Docker (detected from the `Dockerfile`). **Instance type:** Free.
 3. **Health check path:** `/health`.
-4. **Environment variables:** add the same keys as in the table above, plus `DEPLOY_MODE=monolith` and
-   `SERVICE_TOKEN=<any long random string>`.
-5. Click **Create Web Service**, then follow steps 5–8 above.
+4. **Environment variables:** add the same keys as in the table above.
+5. Click **Create Web Service**, then follow steps 5–7 above.
 
 ---
 
@@ -113,8 +107,7 @@ deployed branch on the old code, revert this change's commit on `main` and push 
 
 | Want | Do this |
 |---|---|
-| **Real emails** (instead of preview-only) | Add `EMAIL_TRANSPORT=smtp`, `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=587`, `SMTP_USER=<gmail>`, `SMTP_PASSWORD=<Gmail app password>`, `EMAIL_FROM=Resolve Desk <your@gmail.com>`; or `EMAIL_TRANSPORT=resend` + `RESEND_API_KEY` |
-| **Custom domain** | Render → service → **Settings** → **Custom Domains**, then set `APP_URL` to it |
+| **Custom domain** | Render → service → **Settings** → **Custom Domains** |
 | **Fresh database** | Point `DATABASE_URL` / `QDRANT_URL` at new instances, then run locally once: `.venv\Scripts\python -m telecom_assistant.cli seed --demo --demo-tickets 6` (it writes to whatever `.env` points at) |
 | **No sleeping** | Upgrade the Render instance to Starter (paid) |
 

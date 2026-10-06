@@ -133,7 +133,7 @@ export default function Landing() {
               )}
             </div>
             <p className="caption" style={{ color: "#7c828a", marginTop: 20 }}>
-              Email confirmation in seconds · Your ticket stays open until you say it's fixed
+              Track progress in your dashboard · Your ticket stays open until you say it's fixed
             </p>
           </div>
           <div className="hero-cards" aria-hidden="true">
@@ -299,7 +299,7 @@ export default function Landing() {
         <div className="container section" style={{ textAlign: "center" }}>
           <h2 className="display-md">Your ticket stays live until it's solved.</h2>
           <p style={{ color: "var(--on-dark-soft)", marginTop: 16 }}>
-            Acknowledged by email in seconds. Updated at every step.
+            Follow your ticket and each update in your dashboard.
           </p>
           <div className="row" style={{ justifyContent: "center", marginTop: 32 }}>
             <Link to={primary} className="btn btn-primary btn-lg">

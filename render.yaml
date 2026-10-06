@@ -1,4 +1,4 @@
-# Render Blueprint: one free Docker web service (API + React app + email service in monolith mode).
+# Render Blueprint: one free Docker web service (API + React app).
 # On "New Blueprint", Render asks for every `sync: false` value; paste them from your .env.
 services:
   - type: web
@@ -7,9 +7,6 @@ services:
     plan: free
     healthCheckPath: /health
     envVars:
-      - { key: DEPLOY_MODE, value: monolith }
-      - { key: APP_URL, sync: false }              # https://<your-service>.onrender.com (used in email links)
-      - { key: SERVICE_TOKEN, generateValue: true }
       - { key: GEMINI_API_KEY, sync: false }
       - { key: GROQ_API_KEY, sync: false }
       - { key: JINA_API_KEY, sync: false }

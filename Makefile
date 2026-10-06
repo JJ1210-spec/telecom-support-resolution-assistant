@@ -31,5 +31,5 @@ drift:
 	$(PY) -m telecom_assistant.cli drift
 discover:
 	$(PY) -m telecom_assistant.cli discover
-up:                 ## docker compose: api + notification service
+up:                 ## docker compose: API + React app
 	docker compose up --build -d

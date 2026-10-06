@@ -1,13 +1,9 @@
-"""Reliability tests: LLM failover/breaker/quota, notification idempotency + QStash signatures, outbox DLQ,
-idempotent indexing, KB deprecation, incident radar and solution-drift detection."""
+"""Reliability tests: LLM failover/breaker/quota, idempotent indexing, KB deprecation,
+incident radar and solution-drift detection."""
 
 from __future__ import annotations
 
 import asyncio
-import base64
-import hashlib
-import hmac
-import json
 import time
 
 import numpy as np
@@ -15,12 +11,10 @@ import pytest
 import sqlalchemy as sa
 from pydantic import BaseModel
 
-from telecom_assistant.db import discovery_pool, outbox, steps, tickets, utc_now
+from telecom_assistant.db import discovery_pool, steps, tickets, utc_now
 from telecom_assistant.gateways.kv import MemoryKV
 from telecom_assistant.gateways.llm import CircuitBreaker, LLMGateway, LLMUnavailable, ProviderError
 from telecom_assistant.knowledge.indexer import StaleVersion
-from telecom_assistant.notify.outbox import MAX_ATTEMPTS, enqueue
-from telecom_assistant.notify.service import verify_qstash_signature
 
 from .conftest import test_settings
 
@@ -88,65 +82,6 @@ def test_circuit_breaker_opens_and_half_opens():
     assert breaker.allow()
     breaker.record(True)
     assert breaker.state == "closed"
-
-
-def _jwt(key: str, claims: dict) -> str:
-    def b64(data: bytes) -> str:
-        return base64.urlsafe_b64encode(data).decode().rstrip("=")
-
-    header = b64(json.dumps({"alg": "HS256", "typ": "JWT"}).encode())
-    payload = b64(json.dumps(claims).encode())
-    signature = b64(hmac.new(key.encode(), f"{header}.{payload}".encode(), hashlib.sha256).digest())
-    return f"{header}.{payload}.{signature}"
-
-
-def test_qstash_signature_verification():
-    body = b'{"event_id":"e1"}'
-    digest = base64.urlsafe_b64encode(hashlib.sha256(body).digest()).decode().rstrip("=")
-    claims = {"iss": "Upstash", "sub": "https://x/notify/v1/notify", "exp": time.time() + 60, "nbf": time.time() - 1,
-              "body": digest}
-    token = _jwt("next-key", claims)
-    assert verify_qstash_signature(token, body, "https://x/notify/v1/notify", ["current-key", "next-key"])
-    assert not verify_qstash_signature(token, b'{"tampered":1}', "https://x/notify/v1/notify", ["next-key"])
-    assert not verify_qstash_signature(token, body, "https://x/notify/v1/notify", ["wrong"])
-    expired = _jwt("next-key", {**claims, "exp": time.time() - 100})
-    assert not verify_qstash_signature(expired, body, "", ["next-key"])
-
-
-def test_notifications_are_idempotent(services):
-    event = {"event_id": "evt-1", "template": "ticket_received", "to": "x@test.dev", "ticket_id": "TCK-1",
-             "context": {"name": "X"}}
-    first = asyncio.run(services.notifications.handle(event))
-    second = asyncio.run(services.notifications.handle(event))
-    assert first["status"] == "captured" and second["duplicate"]
-    assert len(services.notifications.list("TCK-1")) == 1
-
-
-def test_outbox_dead_letters_then_replays(services):
-    attempts = []
-
-    async def failing(payload):
-        attempts.append(payload["event_id"])
-        raise RuntimeError("downstream down")
-
-    services.outbox.register("flaky", failing)
-    with services.db.tx() as con:
-        event_id = enqueue(con, "flaky", {"x": 1})
-    for _ in range(MAX_ATTEMPTS):
-        with services.db.tx() as con:
-            con.execute(outbox.update().values(next_attempt_at=utc_now()))
-        asyncio.run(services.outbox.run_once())
-    stats = services.outbox.stats()
-    assert any(d["id"] == event_id for d in stats["dead_letters"]) and len(attempts) == MAX_ATTEMPTS
-
-    async def healthy(payload):
-        attempts.append("ok")
-
-    services.outbox.register("flaky", healthy)
-    assert services.outbox.replay(event_id) == 1
-    asyncio.run(services.outbox.run_once())
-    with services.db.read() as con:
-        assert con.execute(sa.select(outbox.c.status).where(outbox.c.id == event_id)).scalar() == "sent"
 
 
 def test_indexing_is_idempotent_and_versioned(services):
