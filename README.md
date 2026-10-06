@@ -4,6 +4,19 @@ Resolve Desk is a telecom support assistant for customers and admins. It turns a
 
 The application is **one deployable FastAPI service with a React interface**, organized into intake, retrieval, AI, ticket, and insights modules. It uses external model, vector, and database services when configured. It does not require a separate notification service: updates appear in the ticket dashboard and live event stream.
 
+## Live demo
+
+Open the [deployed Resolve Desk](https://resolve-desk.onrender.com/). These accounts are for the synthetic-data demo:
+
+| Role | Email |
+|---|---|
+| Customer | `customer@resolvedesk.dev` |
+| Admin | `admin@resolvedesk.dev` |
+
+**Password for both accounts:** `Demo-mccjC1wyZIo`
+
+These credentials are intentionally public for judging and should be changed or disabled before using the deployment with real customer data.
+
 ## What happens to a complaint
 
 1. A customer registers or signs in, chooses an issue area, and answers adaptive questions when more detail would help. The ticket is saved **before** AI analysis begins.
@@ -16,6 +29,16 @@ The application is **one deployable FastAPI service with a React interface**, or
 **Example:** “My broadband drops each evening; restarting the router did not help.” Intake records the prior restart. Retrieval finds related resolved cases and the broadband guide. If the evidence supports a customer-safe check, the customer may be asked to compare a wired connection with Wi-Fi, with a guide excerpt shown beside the step. If the connection still fails, the ticket moves to the admin queue with the attempted steps attached. The admin can inspect the cited case, ask a question, propose a fix, and receive the customer's confirmation.
 
 Incident Radar separately groups similar recent complaints in one area. The admin sees the incident; linked customers see an in-app notice on their tickets. Resolving an incident proposes a check on each linked open ticket. The system does **not** send email notifications.
+
+## Additional exploration
+
+After signing in as an admin, these areas show how the system reaches and checks its decisions:
+
+- **Ticket Copilot:** open a ticket in the admin queue to inspect its classification, route, suggested steps, citations, and full source details for the retrieved tickets or KB articles.
+- **Deep Analysis:** open it from Copilot to analyze that ticket's complaint, or enter a separate complaint. It shows the retrieval, triage, grounded draft, routing reasons, latency, and source details without creating a ticket. Opening a source and returning preserves the analysis result.
+- **Taxonomy & discovery:** review low-confidence and unfamiliar complaints, run discovery, and approve or reject proposed issue classes. Approval changes the live taxonomy.
+- **Data drift:** inspect changes in complaint mix, retrieval coverage, and the success of previously suggested steps. Alerts can prompt discovery or a KB review.
+- **Incident Radar:** inspect groups of similar recent complaints from one area and the tickets linked to an incident.
 
 ## Stack
 
@@ -32,6 +55,27 @@ Incident Radar separately groups similar recent complaints in one area. The admi
 Authentication uses HttpOnly sessions, server-side customer/admin role checks, ticket ownership checks, and CSRF protection. Server-Sent Events update open dashboards; stored ticket events and messages remain available when a user returns.
 
 For diagrams and design details, see [Architecture](docs/architecture.md).
+
+## Architecture Diagram
+
+```mermaid
+flowchart LR
+  C[Customer] --> UI[React interface]
+  A[Admin] --> UI
+  UI <--> API[FastAPI application]
+  API --> DB[(PostgreSQL or local SQLite)]
+  API --> PIPE[Intake, triage, retrieval, resolution and routing]
+  PIPE --> LLM[Gemini / Groq LLM gateway]
+  PIPE --> EMB[Jina or local embeddings]
+  PIPE <--> IDX[(Qdrant or local index)]
+  API --> INS[Incident Radar, drift and discovery]
+  INS --> DB
+  API --> EVT[Ticket events and live updates]
+  EVT --> UI
+  API --> KV[(Upstash Redis or memory)]
+```
+
+The database keeps accounts, tickets, events, and evaluation runs. The search index stores retrievable resolved cases and KB sections; it can be rebuilt from saved data. The AI pipeline runs after a ticket is saved and records its decision and evidence back to the database. See the [detailed architecture](docs/architecture.md) for algorithms and failure paths.
 
 ## Dataset
 
@@ -92,6 +136,34 @@ cd frontend && npm run build
 The Python tests use a deterministic fake LLM, SQLite, a hash embedder, and a local vector index, so they run without external API calls. They cover routing and P1 safeguards, citation and privacy gates, authentication/CSRF, the customer–admin lifecycle, learning and restart recovery, provider failure behavior, incident grouping, versioned indexing, and drift signals. GitHub [CI](.github/workflows/ci.yml) also runs lint, tests, dataset validation, frontend build, and a Docker build on pushes and pull requests.
 
 The [saved hosted evaluation report](reports/eval_20261003_195637.md) used the **earlier 56-case** synthetic set (48 answerable, 8 expected abstentions). It reported intent macro-F1 **1.000**, P1 recall **100%**, severity macro-F1 **0.544**, KB Recall@5 **0.979** with hybrid search and reranking, and median/p95 analysis latency **5.4 s / 27.3 s**. It routed 36 cases to human and 20 to assisted, with **no self-service cases** in that run. These results do not establish self-service safety or accuracy on the current 74-case set. A fresh hosted evaluation is needed before making claims about the expanded dataset. The [nightly workflow](.github/workflows/nightly.yml) is configured to run live evaluation, drift, and discovery when its secrets are supplied.
+
+### Evals on System health
+
+An admin can open **System health → Evaluation** to see the newest evaluation run stored in the database. If no run has been saved, the page says so. The hosted evaluation can be started with `python -m telecom_assistant.cli eval --concurrency 1` using the hosted environment, or with **GitHub Actions → nightly → Run workflow** after its required secrets are configured. It writes a report under `reports/` and saves the metrics that the admin page reads.
+
+| Measure | What it checks |
+|---|---|
+| Intent macro-F1 and P1 recall | Classification across issue classes and detection of the most urgent cases |
+| Unsafe self-service routes | Whether a severe or unanswerable complaint was incorrectly offered autonomous steps |
+| Citation validity and step support | Whether suggested steps cite allowed evidence and are supported by it |
+| KB Recall@5, MRR@10, ticket hit@5 | Whether relevant guidance and similar tickets appear near the top of search results |
+| Clarification before/after accuracy | Whether adaptive questions improve intent identification |
+| Latency and degraded-mode rates | How long each stage takes and how often a provider fallback is needed |
+
+**Services & quotas** is the other System health tab. It shows database, vector-index and cache status, indexed counts, model quota meters, breaker status, and observed latency for that instance. A displayed evaluation is a snapshot of its recorded run, not a continuously recalculated score.
+
+## Production scale considerations
+
+The deployed design uses one API container and external managed services. The following are scaling steps, not claims that the current deployment already implements them:
+
+| Area | Current design | Change needed at higher volume |
+|---|---|---|
+| Live updates | In-process Server-Sent Events bus with stored ticket history | Shared pub/sub for multiple API replicas |
+| Resolution learning | Background work in the API process with startup recovery | Durable job queue and separate workers |
+| Search | Qdrant collections with dense and sparse retrieval | Sharding, replicas, and capacity planning for a much larger corpus |
+| Database | PostgreSQL system of record | Backups, retention, partitioning, and read scaling as traffic grows |
+| AI capacity | Provider chains, rate limits, quota meters, and cache | Paid capacity and load testing against real traffic patterns |
+| Privacy | Regex-based redaction and role-scoped source views | Stronger PII detection, retention rules, and provider agreements for real customer data |
 
 ## Operational limits
 
