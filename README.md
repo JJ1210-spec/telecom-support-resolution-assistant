@@ -2,7 +2,7 @@
 
 Resolve Desk is a telecom support assistant for customers and admins. It turns a customer's complaint into an issue classification, retrieves similar **resolved** cases and published knowledge-base (KB) guidance, and drafts cited troubleshooting steps. Safe, recurring issues can be tried by the customer; sensitive, severe, or poorly supported issues go to an admin. Tickets retain the conversation, attempted steps, and outcome so a confirmed fix can improve future searches.
 
-The live Render demo remains **one deployable FastAPI service with a React interface**. The repository also contains an optional three-service deployment for triage, resolution, and data evolution, connected to the same customer/admin gateway through versioned HTTP APIs. Those changes have not been deployed to the linked demo. Both modes use the same analysis implementation; the three-service mode is covered by direct-versus-HTTP parity tests. Updates appear in the ticket dashboard and live event stream.
+The Docker Compose architecture runs four application processes: a customer/admin gateway and separate **Triage**, **Resolution**, and **Discovery** HTTP services. PostgreSQL and Qdrant run as two additional containers. The gateway owns authentication, tickets, customer/admin APIs, Incident Radar, and the React interface; it calls the AI services through versioned internal APIs. The services share the existing domain package, PostgreSQL schema, and Qdrant collections. This is an incremental microservice extraction, with direct-versus-HTTP parity tests for the complaint analysis path. Ticket updates appear in the dashboard and live event stream.
 
 ## Live demo
 
@@ -19,16 +19,16 @@ These credentials are intentionally public for judging and should be changed or 
 
 ## What happens to a complaint
 
-1. A customer registers or signs in, chooses an issue area, and answers adaptive questions when more detail would help. The ticket is saved **before** AI analysis begins.
-2. The backend masks common personal identifiers for AI processing. Hybrid search retrieves similar resolved tickets and published KB sections. Unresolved tickets cannot supply resolution evidence.
-3. When an LLM provider is configured, it classifies intent, product, severity, and sentiment and drafts steps from the retrieved evidence. Code validates citation IDs, filters unsupported promises, and restricts customer actions to approved self-help guidance. Provider failures trigger conservative fallbacks.
-4. The routing policy chooses **self-service** (safe steps for a confident, recurring low-severity issue), **assisted** (customer-safe steps while an admin reviews), or **human** (admin owns the issue). P1, sensitive, unknown, injection-like, and insufficient-evidence cases take the human route. Where reviewed public KB text supports it, an admin-owned ticket may still show brief, read-only precautions.
-5. The customer sees their ticket status, conversation, suggested steps, and privacy-safe evidence for AI steps. Admins see the full cited KB articles and past resolved cases, internal diagnostic steps, the ticket history, and a Copilot brief. **Deep Analysis** lets an admin examine another retrieval and draft result without losing it when opening a source.
+1. A customer registers or signs in through the gateway, chooses an issue area, and answers adaptive questions from Triage when more detail would help. The gateway saves the ticket **before** complaint analysis begins.
+2. The gateway masks common personal identifiers and sends the complaint to Resolution. Resolution searches similar **resolved** tickets and published KB sections with dense and sparse retrieval. Unresolved tickets cannot supply resolution evidence.
+3. Resolution calls Triage with the complaint, retrieved neighbors, and intake answers. Triage classifies intent, product, severity, and sentiment using the live taxonomy, rules, and a configured LLM when available.
+4. Resolution drafts evidence-grounded steps, validates citation IDs, filters unsupported promises, and applies the routing policy: **self-service** for a confident, recurring, safe issue; **assisted** for customer-safe steps during admin review; or **human** for admin ownership. P1, sensitive, unknown, injection-like, or insufficient-evidence cases take the human route. Provider failures trigger conservative fallbacks. Where reviewed public KB text supports it, an admin-owned ticket may still show brief, read-only precautions.
+5. The gateway stores the classification, route, steps, and evidence with the ticket. The customer sees privacy-safe evidence for AI steps; admins can inspect full cited KB articles and past resolved cases, internal diagnostic steps, ticket history, and a Copilot brief. **Deep Analysis** lets an admin examine another retrieval and draft result without losing it when opening a source.
 6. Step outcomes can escalate the same ticket. Admins can ask questions, send messages, and propose a fix. The customer confirms success or reopens the ticket; an admin can also resolve it with a written note. Resolution learning indexes a searchable case and proposes a KB draft when guidance is missing. An admin must review that draft before publication.
 
 **Example:** “My broadband drops each evening; restarting the router did not help.” Intake records the prior restart. Retrieval finds related resolved cases and the broadband guide. If the evidence supports a customer-safe check, the customer may be asked to compare a wired connection with Wi-Fi, with a guide excerpt shown beside the step. If the connection still fails, the ticket moves to the admin queue with the attempted steps attached. The admin can inspect the cited case, ask a question, propose a fix, and receive the customer's confirmation.
 
-Incident Radar separately groups similar recent complaints in one area. The admin sees the incident; linked customers see an in-app notice on their tickets. Resolving an incident proposes a check on each linked open ticket. The system does **not** send email notifications.
+Incident Radar runs in the gateway and groups similar recent complaints in one area. The admin sees the incident; linked customers see an in-app notice on their tickets. Resolving an incident proposes a check on each linked open ticket. The system does **not** send email notifications. Discovery handles unfamiliar-complaint pooling, drift analysis, and proposed taxonomy changes; an admin approves a new class before it becomes active.
 
 ## Additional exploration
 
@@ -45,16 +45,16 @@ After signing in as an admin, these areas show how the system reaches and checks
 | Layer | Technology |
 |---|---|
 | Web interface | React 18, JavaScript/JSX, Vite |
-| API and domain logic | Python 3.11+, FastAPI, Pydantic, SQLAlchemy |
+| Gateway and three internal HTTP services | Python 3.11+, FastAPI, Pydantic, SQLAlchemy |
 | System of record | PostgreSQL (Neon when hosted); SQLite in offline mode |
 | Search | Qdrant dense + BM25 sparse retrieval, fusion and optional reranking; in-memory index fallback |
 | AI providers | Configurable Gemini and Groq chains; optional Anthropic. Jina embeddings/reranker when configured |
 | Caching and observability | Upstash Redis or in-memory fallback; Prometheus-format metrics and optional Langfuse traces |
-| Operations | Docker, Render blueprint, GitHub Actions |
+| Operations | Docker Compose, GitHub Actions |
 
 Authentication uses HttpOnly sessions, server-side customer/admin role checks, ticket ownership checks, and CSRF protection. Server-Sent Events update open dashboards; stored ticket events and messages remain available when a user returns.
 
-For the deployed design, see [Architecture](docs/architecture.md). The [three-service architecture](docs/microservices.md) documents service contracts, deployment steps, failure behavior, and remaining gateway dependencies.
+The [microservice architecture](docs/microservices.md) documents service contracts, Docker setup, failure behavior, and remaining gateway dependencies. [Architecture](docs/architecture.md) explains the underlying retrieval, decision, and ticket workflows.
 
 ## Architecture Diagram
 
@@ -62,20 +62,26 @@ For the deployed design, see [Architecture](docs/architecture.md). The [three-se
 flowchart LR
   C[Customer] --> UI[React interface]
   A[Admin] --> UI
-  UI <--> API[FastAPI application]
-  API --> DB[(PostgreSQL or SQLite)]
-  API --> PIPE[Intake, triage, retrieval, resolution and routing]
-  PIPE --> LLM[Gemini / Groq LLM gateway]
-  PIPE --> EMB[Jina or hash embeddings]
-  PIPE <--> IDX[(Qdrant or in-memory index)]
-  API --> INS[Incident Radar, drift and discovery]
-  INS --> DB
-  API --> EVT[Ticket events and live updates]
-  EVT --> UI
-  API --> KV[(Upstash Redis or memory)]
+  UI <--> GW[Gateway :8000]
+  GW -->|adaptive intake| T[Triage :8001]
+  GW -->|complaint analysis| R[Resolution :8002]
+  R -->|classification request| T
+  GW -->|pool, drift, taxonomy review| D[Discovery :8003]
+  GW -->|ticket events| UI
+  GW --> PG[(PostgreSQL)]
+  T --> PG
+  R --> PG
+  D --> PG
+  GW --> Q[(Qdrant)]
+  T --> Q
+  R --> Q
+  D --> Q
+  T --> AI[Configured AI providers]
+  R --> AI
+  D --> AI
 ```
 
-The database keeps accounts, tickets, events, and evaluation runs. The search index stores retrievable resolved cases and KB sections; it can be rebuilt from saved data. The AI pipeline runs after a ticket is saved and records its decision and evidence back to the database. See the [detailed architecture](docs/architecture.md) for algorithms and failure paths.
+This diagram describes the **six-container Docker Compose topology**: four application processes plus PostgreSQL and Qdrant. Only the gateway publishes a host port. Internal calls use a shared service token; the gateway retains customer/admin authorization and controls which source details each role can see. PostgreSQL keeps accounts, tickets, events, taxonomy, and evaluation runs. Qdrant holds retrievable resolved cases and KB sections. With internal service URLs unset, the gateway can run the same analysis implementation in-process; that fallback is not an additional container. See the [microservice architecture](docs/microservices.md) for the HTTP contracts and failure paths.
 
 ## Dataset
 
@@ -121,12 +127,13 @@ An admin can open **System health → Evaluation** to see the newest evaluation 
 
 ## Production scale considerations
 
-The deployed design uses one API container and external managed services. The following are scaling steps, not claims that the current deployment already implements them:
+The Docker Compose topology separates the gateway, triage, resolution, and discovery processes, but they still share PostgreSQL, Qdrant, and Python domain code. The following are scaling steps, not claims that the current design already implements them:
 
 | Area | Current design | Change needed at higher volume |
 |---|---|---|
-| Live updates | In-process Server-Sent Events bus with stored ticket history | Shared pub/sub for multiple API replicas |
-| Resolution learning | Background work in the API process with startup recovery | Durable job queue and separate workers |
+| Service boundaries | Four HTTP application processes with shared data stores | Independent data ownership and narrower service dependencies where useful |
+| Live updates | Gateway's in-process Server-Sent Events bus with stored ticket history | Shared pub/sub for multiple gateway replicas |
+| Resolution learning | Background work in the gateway process with startup recovery | Durable job queue and separate workers |
 | Search | Qdrant collections with dense and sparse retrieval | Sharding, replicas, and capacity planning for a much larger corpus |
 | Database | PostgreSQL system of record | Backups, retention, partitioning, and read scaling as traffic grows |
 | AI capacity | Provider chains, rate limits, quota meters, and cache | Paid capacity and load testing against real traffic patterns |
@@ -146,6 +153,9 @@ src/telecom_assistant/ai/        Intake, triage, cited resolution, Copilot and s
 src/telecom_assistant/knowledge/ Indexing, retrieval, source details and taxonomy
 src/telecom_assistant/insights/  Incident Radar, drift and discovery
 src/telecom_assistant/gateways/  Model, embedding, vector and cache integrations
+src/telecom_assistant/microservices/  Internal HTTP apps, clients and contracts
+services/                       Triage, resolution and discovery Dockerfiles
+docker-compose.yml              Gateway, three AI services, PostgreSQL and Qdrant
 frontend/src/                   Customer and admin interface
 data/synthetic/v1/              Synthetic corpus and held-out evaluation inputs
 tests/                          Offline regression suite
