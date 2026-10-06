@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../../api/client";
 import { AdminSourceLink } from "../../components/AdminSourceLink";
@@ -19,6 +19,8 @@ import {
   useToast,
 } from "../../components/ui";
 import { useLiveEvents, useResource } from "../../hooks/useLive";
+import { useAuth } from "../../hooks/useAuth";
+import { analysisEntry, editAnalysis, runAnalysis, subscribeAnalysis } from "./deepAnalysisState";
 export function OverviewPage() {
   const stats = useResource(() => api.get("/v1/admin/stats"), []);
   useLiveEvents((e) => {
@@ -203,68 +205,43 @@ const SAMPLES = [
   "I need a guaranteed refund by tonight because my internet was slow yesterday.",
 ];
 export function PlaygroundPage() {
+  const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const ticketId = searchParams.get("ticket");
-  const [text, setText] = useState(ticketId ? "" : SAMPLES[0]);
-  const [result, setResult] = useState(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(null);
-  const request = useRef(0);
-  const editDraft = (value) => {
-    request.current++;
-    setBusy(false);
-    setText(value);
-    setResult(null);
-    setError(null);
-  };
+  const entry = analysisEntry(`${user.id}:${ticketId || "manual"}`, ticketId ? "" : SAMPLES[0]);
+  const [view, setView] = useState(() => ({ ...entry, source: entry }));
   useEffect(() => {
-    if (!ticketId) return;
-    const current = ++request.current;
-    setText("");
-    setResult(null);
-    setBusy(true);
-    setError(null);
-    api.get(`/v1/admin/tickets/${encodeURIComponent(ticketId)}`)
-      .then((ticket) => {
-        if (current !== request.current) return null;
-        setText(ticket.complaint);
-        return api.post("/v1/admin/analyze", { text: ticket.complaint, use_cache: false });
-      })
-      .then((analysis) => { if (analysis && current === request.current) setResult(analysis); })
-      .catch((err) => { if (current === request.current) setError(err instanceof Error ? err.message : "Failed"); })
-      .finally(() => { if (current === request.current) setBusy(false); });
-    return () => { request.current++; };
-  }, [ticketId]);
-  const run = async () => {
-    const current = ++request.current;
-    setBusy(true);
-    setError(null);
-    setResult(null);
-    try {
-      const analysis = await api.post("/v1/admin/analyze", { text, use_cache: false });
-      if (current === request.current) setResult(analysis);
-    } catch (err) {
-      if (current === request.current) setError(err instanceof Error ? err.message : "Failed");
-    } finally {
-      if (current === request.current) setBusy(false);
+    const unsubscribe = subscribeAnalysis(entry, () => setView({ ...entry, source: entry }));
+    if (ticketId && !entry.started) {
+      void runAnalysis(entry,
+        async () => (await api.get(`/v1/admin/tickets/${encodeURIComponent(ticketId)}`)).complaint,
+        (complaint) => api.post("/v1/admin/analyze", { text: complaint, use_cache: false }));
     }
-  };
+    return unsubscribe;
+  }, [entry, ticketId]);
+  const { text, result, loading: busy, error } = view.source === entry ? view : entry;
+  const run = () => runAnalysis(entry,
+    ticketId && !entry.text ? async () => (await api.get(`/v1/admin/tickets/${encodeURIComponent(ticketId)}`)).complaint
+      : () => Promise.resolve(entry.text),
+    (complaint) => api.post("/v1/admin/analyze", { text: complaint, use_cache: false }));
   return (
     <div className="stack-lg">
       <ConsoleHead eyebrow="Explainability" title="Deep Analysis" />
       <div className="card stack">
         {ticketId && <div className="caption">Analyzing complaint from <Link to={`/console/tickets/${encodeURIComponent(ticketId)}`}>{ticketId}</Link></div>}
         <textarea className="textarea" aria-label="Complaint draft" value={text}
-          onChange={(e) => editDraft(e.target.value)} />
+          onChange={(e) => editAnalysis(entry, e.target.value)} />
         <div className="chips">
           {SAMPLES.map((s) => (
-            <button key={s} className="chip" onClick={() => editDraft(s)}>
+            <button key={s} className="chip" onClick={() => editAnalysis(entry, s)}>
               {s.slice(0, 42)}…
             </button>
           ))}
         </div>
         <div className="row">
-          <button className="btn btn-primary" disabled={busy || text.trim().length < 5} onClick={() => void run()}>
+          <button className="btn btn-primary"
+            disabled={busy || (text.trim().length < 5 && !(ticketId && !text && error))}
+            onClick={() => void run()}>
             {busy ? <Spinner light /> : "Analyze"}
           </button>
           <span className="caption">
